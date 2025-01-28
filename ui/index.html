@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+   <meta charset="UTF-8">
+   <title>IKE Expedientes Automation</title>
+   <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+   <div class="container">
+       <h1>IKE Expedientes Automation</h1>
+       
+       <div class="control-panel">
+           <div class="file-section">
+               <h2>Archivo de Expedientes</h2>
+               <div class="buttons-container">
+                   <button id="selectExcel">Seleccionar Excel</button>
+                   <button id="startProcess" disabled>Iniciar Proceso</button>
+               </div>
+               <span id="selectedFile">No se seleccionó ningún archivo.</span>
+               <div id="status"></div>
+               <div class="progress-bar">
+                   <div id="progress" class="progress"></div>
+               </div>
+           </div>
+       </div>
+
+       <div class="results-section">
+           <h2>Resultados</h2>
+           <div id="results" class="results-content"></div>
+       </div>
+   </div>
+
+   <script src="assets/js/renderer.js"></script>
+</body>
+</html>

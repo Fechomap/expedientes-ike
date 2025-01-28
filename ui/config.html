@@ -1,0 +1,99 @@
+<!-- ui/config.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Configuración Inicial</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+            margin: 0;
+        }
+        .container {
+            max-width: 300px;
+            margin: 20px auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: #dc3545;
+            margin-top: 10px;
+            font-size: 14px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Configuración Inicial</h2>
+        <form id="configForm">
+            <div class="form-group">
+                <label for="username">Usuario:</label>
+                <input type="email" id="username" placeholder="correo@ejemplo.com" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Contraseña:</label>
+                <input type="password" id="password" placeholder="Contraseña" required>
+            </div>
+            <button type="submit">Guardar Configuración</button>
+            <div id="error" class="error"></div>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('configForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const result = await window.electronAPI.saveConfig({ username, password });
+                if (result.success) {
+                    window.close();
+                } else {
+                    document.getElementById('error').textContent = result.error || 'Error al guardar la configuración';
+                }
+            } catch (error) {
+                document.getElementById('error').textContent = error.message || 'Error al guardar la configuración';
+            }
+        });
+    </script>
+</body>
+</html>

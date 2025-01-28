@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Verificación de Licencia</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <style>
+    .token-section {
+      margin-top: 20px;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background-color: #f9f9f9;
+    }
+    
+    .input-group {
+      margin-bottom: 15px;
+    }
+    
+    .input-group input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    
+    .error-message {
+      color: #dc3545;
+      margin-top: 5px;
+      font-size: 14px;
+    }
+    
+    .success-message {
+      color: #28a745;
+      margin-top: 5px;
+      font-size: 14px;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-radius: 50%;
+      border-top: 3px solid #3498db;
+      animation: spin 1s linear infinite;
+      margin-left: 10px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Verificación de Licencia</h1>
+    
+    <!-- Sección de Token -->
+    <div class="token-section">
+      <h2>Validación de Token</h2>
+      <div id="tokenStatus">
+        <div class="input-group">
+          <label for="tokenInput">Ingrese su token de acceso:</label>
+          <input type="text" id="tokenInput" placeholder="Ingrese el token aquí">
+          <div id="tokenError" class="error-message"></div>
+          <div id="tokenSuccess" class="success-message"></div>
+        </div>
+        <button id="validateToken">Validar Token</button>
+        <span id="validationLoader" class="loading" style="display: none;"></span>
+      </div>
+    </div>
+
+    <!-- Sección de Licencia -->
+    <div class="license-section">
+      <h2>Estado de Licencia</h2>
+      <div id="licenseStatus">
+        <p>Verificando...</p>
+      </div>
+      <div id="renewalActions" style="display: none;">
+        <p>Su licencia está próxima a vencerse. Por favor, realice el pago para renovarla.</p>
+        <button id="renewLicense">Renovar Licencia</button>
+      </div>
+    </div>
+  </div>
+  <script src="assets/js/license-ui.js"></script>
+</body>
+</html>
