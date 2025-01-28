@@ -247,7 +247,8 @@ class LicenseHandler {
       if (!storedToken || !storedToken.token) {
         return {
           valid: false,
-          message: 'No hay token almacenado'
+          message: 'No hay token almacenado',
+          requiresToken: true  // Añadimos esta bandera
         };
       }
   
@@ -258,7 +259,8 @@ class LicenseHandler {
       if (now.isAfter(expirationDate)) {
         return {
           valid: false,
-          message: ERROR_MESSAGES.EXPIRED_TOKEN
+          message: ERROR_MESSAGES.EXPIRED_TOKEN,
+          requiresToken: true  // También aquí
         };
       }
   
@@ -272,7 +274,8 @@ class LicenseHandler {
       console.error('Error en checkInitialLicense:', error);
       return {
         valid: false,
-        message: error.message || 'Error al verificar la licencia'
+        message: error.message || 'Error al verificar la licencia',
+        requiresToken: true  // Y aquí
       };
     }
   }
@@ -289,9 +292,9 @@ class LicenseHandler {
   
       console.log('Realizando petición al servidor...');
       const response = await axios.get(
-        `https://ike-license-manager-9b796c40a448.herokuapp.com/api/check-validity/${storedToken.token}`,
+        `${API_CONFIG.BASE_URL}/api/check-validity/${storedToken.token}`,
         { 
-          timeout: 10000, // Aumentamos el timeout a 10 segundos
+          timeout: 10000,
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json'
@@ -304,6 +307,7 @@ class LicenseHandler {
       // La API devuelve true/false directamente
       const isValid = response.data === true;
       
+      // Ya no borramos el token aquí, solo retornamos el resultado
       return {
         valid: isValid,
         message: isValid ? 'Token válido en servidor' : 'Token inválido en servidor'
@@ -311,10 +315,22 @@ class LicenseHandler {
   
     } catch (error) {
       console.error('Error en validación con servidor:', error);
+      
+      // Si hay error de respuesta del servidor (ej: 404, 500)
       if (error.response) {
-        console.error('Respuesta del servidor:', error.response.data);
+        console.error('Respuesta de error del servidor:', error.response.data);
+        return { 
+          valid: false, 
+          message: `Error del servidor: ${error.response.status}` 
+        };
       }
-      throw new Error(`Error de conexión con el servidor: ${error.message}`);
+      
+      // Si hay error de red/conexión
+      if (error.code === 'ECONNABORTED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+        throw new Error('Error de conexión: No se pudo contactar con el servidor de licencias');
+      }
+  
+      throw new Error(`Error de validación: ${error.message}`);
     }
   }
 

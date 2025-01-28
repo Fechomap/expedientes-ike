@@ -56,17 +56,10 @@ async function verificarLicenciaInicial() {
     const tokenResult = await licenseHandler.checkInitialLicense();
     console.log(`Estado del token local: ${JSON.stringify(tokenResult)}`);
 
+    // Si no hay token local o es inválido, redirigir a pantalla de licencia
     if (!tokenResult.valid) {
-      console.log('Token local inválido');
-      await dialog.showMessageBox({
-        type: 'error',
-        title: 'Token Inválido',
-        message: tokenResult.message || 'El token no es válido.',
-        detail: 'La aplicación se cerrará.',
-        buttons: ['OK']
-      });
-      app.quit();
-      return { valid: false };
+      console.log('Token local no encontrado o inválido');
+      return { valid: false, requiresToken: true };
     }
 
     // 2. Validación explícita con el servidor
@@ -75,31 +68,30 @@ async function verificarLicenciaInicial() {
       const serverValidation = await licenseHandler.validateWithServer();
       console.log('Resultado de validación con servidor:', serverValidation);
       
+      // Si el servidor invalida el token, redirigir a pantalla de licencia
       if (!serverValidation.valid) {
         console.log('Token invalidado por el servidor');
-        await dialog.showMessageBox({
-          type: 'error',
-          title: 'Token Inválido',
-          message: 'El token no ha sido validado por el servidor.',
-          detail: 'La aplicación se cerrará.',
-          buttons: ['OK']
-        });
-        app.quit();
-        return { valid: false };
+        return { valid: false, requiresToken: true };
       }
     } catch (serverError) {
+      // Si hay error de conexión, mostramos el mensaje y cerramos la aplicación
       console.error('Error en validación con servidor:', serverError);
+      
       await dialog.showMessageBox({
         type: 'error',
         title: 'Error de Conexión',
-        message: 'No se pudo validar el token con el servidor.',
-        detail: 'La aplicación se cerrará.',
+        message: 'No se pudo validar el token con el servidor',
+        detail: 'Verifique su conexión a internet e intente nuevamente.',
         buttons: ['OK']
       });
+      
+      // Cerramos la aplicación
       app.quit();
-      return { valid: false };
+      // Retornamos null para indicar que no debe continuar el proceso
+      return null;
     }
 
+    // Solo llegamos aquí si ambas validaciones fueron exitosas
     // 3. Verificar credenciales
     const credentials = configHandler.getCredentials();
     console.log('Verificando credenciales...');
@@ -114,15 +106,18 @@ async function verificarLicenciaInicial() {
 
   } catch (error) {
     console.error('Error en verificación inicial:', error);
+    
     await dialog.showMessageBox({
       type: 'error',
       title: 'Error de Verificación',
-      message: 'Error al verificar la licencia.',
-      detail: 'La aplicación se cerrará.',
+      message: 'Error al verificar la licencia',
+      detail: error.message || 'Error desconocido al verificar la licencia',
       buttons: ['OK']
     });
+    
+    // En caso de error general también cerramos la aplicación
     app.quit();
-    return { valid: false, error: error.message };
+    return null;
   }
 }
 
@@ -141,6 +136,12 @@ async function createMainWindow() {
 
   try {
     const status = await verificarLicenciaInicial();
+    
+    // Si status es null, significa que hubo un error de conexión y la aplicación ya se está cerrando
+    if (status === null) {
+      return;
+    }
+
     console.log(`Estado de verificación inicial: ${JSON.stringify(status)}`);
 
     if (!status.valid) {
@@ -167,6 +168,7 @@ async function createMainWindow() {
       loadingWindow = null;
     }
     dialog.showErrorBox('Error', 'Error al iniciar la aplicación');
+    app.quit();
   }
 }
 
