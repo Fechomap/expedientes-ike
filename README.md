@@ -12,12 +12,12 @@ Una aplicación de escritorio para automatizar la gestión y validación de expe
 
 1. **Clonar el repositorio:**
 ```bash
-git clone https://github.com/tu-usuario/ike-expedientes-automation.git
+git clone https://github.com/Fechomap/expedientes-ike.git
 ```
 
 2. **Navegar al directorio:**
 ```bash
-cd ike-expedientes-automation
+cd expedientes-ike
 ```
 
 3. **Instalar dependencias:**
@@ -49,7 +49,7 @@ npm install
 ## 📁 Estructura del Proyecto
 
 ```
-ike-expedientes-automation/
+expedientes-ike/
 ├── src/
 │   ├── config/
 │   │   └── constants.js
@@ -75,7 +75,7 @@ ike-expedientes-automation/
 ### macOS
 Si la aplicación no abre por restricciones de seguridad:
 ```bash
-sudo xattr -cr /Applications/ike-expedientes-automation.app
+sudo xattr -cr /Applications/expedientes-ike.app
 ```
 
 ### Windows
