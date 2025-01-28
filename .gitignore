@@ -15,4 +15,3 @@ data/*
 
 # Carpetas de distribución o compilación (si las usas)
 /dist
-/build
