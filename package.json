@@ -6,15 +6,28 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --debug",
-    "build:mac": "electron-builder --mac",
+    "postinstall": "electron-builder install-app-deps",
+    "clean": "rimraf dist",
+    "build": "electron-builder -mwl",
     "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
-    "build": "electron-builder -mwl"
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "electron",
+    "automation",
+    "ike",
+    "expedientes"
+  ],
+  "author": {
+    "name": "IKE Asistencia",
+    "email": "soporte@ikeasistencia.com"
+  },
   "license": "ISC",
   "dependencies": {
+    "asar": "^3.2.0",
     "axios": "^1.7.9",
     "crypto-js": "^4.2.0",
     "dotenv": "^16.4.7",
@@ -24,30 +37,64 @@
     "moment": "^2.30.1",
     "mongodb": "^6.12.0",
     "papaparse": "^5.5.1",
-    "puppeteer": "^19.11.1"
+    "puppeteer-core": "^19.11.1"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "electron": "^28.0.0",
-    "electron-builder": "^24.0.0"
+    "electron-builder": "^24.0.0",
+    "javascript-obfuscator": "^4.1.1",
+    "rimraf": "^5.0.10"
   },
   "build": {
     "appId": "com.ike.expedientes",
     "productName": "IKE Expedientes Automation",
+    "copyright": "Copyright © 2024 IKE Asistencia",
+    "asar": true,
+    "asarUnpack": [
+      "**/node_modules/puppeteer-core/**/*"
+    ],
+    "files": [
+      "src/**/*",
+      "ui/**/*",
+      "build/**/*",
+      "package.json"
+    ],
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
     "mac": {
-      "category": "public.app-category.utilities",
-      "icon": "ui/assets/icon.icns"
+      "category": "public.app-category.business",
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true
     },
     "win": {
-      "target": ["nsis"],
-      "icon": "ui/assets/icon.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator"
     },
-    "linux": {
-      "target": ["AppImage"],
-      "category": "Utility",
-      "icon": "ui/assets/icon.png"
-    }
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "IKE Expedientes Automation",
+      "uninstallDisplayName": "IKE Expedientes Automation",
+      "artifactName": "IKE-Expedientes-Automation-Setup-${version}.${ext}"
+    },
+    "afterPack": "./build/scripts/after-pack.js"
   }
 }

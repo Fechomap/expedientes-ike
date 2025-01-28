@@ -1,0 +1,53 @@
+appId: "com.ikeautomation.app"
+productName: "IKE Expedientes Automation"
+asar: true
+asarUnpack: ["**/node_modules/puppeteer-core/**/*"]
+removePackageScripts: true
+compression: "maximum"
+
+directories:
+  output: "dist"
+  buildResources: "build"
+
+files:
+  - "!{src,scripts,test,tools,docs}/**/*"
+  - "!**/*.{md,txt,ts,map}"
+  - "!**/package-lock.json"
+  - "!**/README.md"
+  - "!**/LICENSE"
+
+win:
+  target: "nsis"
+  icon: "build/icon.ico"
+  requestedExecutionLevel: "requireAdministrator"
+  signAndEditExecutable: true
+  artifactName: "${productName}-Setup-${version}.${ext}"
+
+nsis:
+  oneClick: false
+  perMachine: true
+  allowToChangeInstallationDirectory: false
+  deleteAppDataOnUninstall: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "${productName}"
+  uninstallDisplayName: "${productName}"
+  differentialPackage: false
+
+mac:
+  target: "dmg"
+  icon: "build/icon.icns"
+  category: "public.app-category.business"
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: "build/entitlements.mac.plist"
+  entitlementsInherit: "build/entitlements.mac.plist"
+
+linux:
+  target: "AppImage"
+  icon: "build/icon.png"
+  category: "Office"
+  synopsis: "IKE Expedientes Automation"
+  description: "Aplicación para automatizar la gestión de expedientes"
+
+afterPack: "./build/scripts/after-pack.js"
