@@ -58,7 +58,23 @@ async function verificarLicenciaInicial() {
 
     // Si no hay token local o es inválido, redirigir a pantalla de licencia
     if (!tokenResult.valid) {
-      console.log('Token local no encontrado o inválido');
+      // Si el token está expirado pero es renovable
+      if (tokenResult.expired && tokenResult.renewable) {
+        // Mostrar mensaje indicando que debe renovarse en IKE Licencias
+        await dialog.showMessageBox({
+          type: 'warning',
+          title: 'Licencia Expirada',
+          message: tokenResult.message,
+          detail: 'Por favor, renueve su licencia en la aplicación IKE Licencias y luego reinicie esta aplicación.',
+          buttons: ['OK']
+        });
+        
+        // Aquí no direccionamos a la pantalla de token, simplemente cerramos la app
+        app.quit();
+        return null;
+      }
+      
+      // Para otros casos de token inválido, procedemos normalmente
       return { valid: false, requiresToken: true };
     }
 

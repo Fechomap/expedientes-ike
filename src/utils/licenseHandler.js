@@ -14,12 +14,15 @@ const TOKEN_STATUS = {
   VALID: 'valid',
   EXPIRED: 'expired',
   INVALID: 'invalid',
-  PENDING: 'pending'
+  PENDING: 'pending',
+  RENEWABLE: 'renewable'  // Nuevo estado
 };
 
+// Actualizar el mensaje para tokens expirados
 const ERROR_MESSAGES = {
   INVALID_TOKEN: 'Token inválido. Por favor, ingresa un token válido.',
-  EXPIRED_TOKEN: 'El token ha expirado. Por favor, solicita uno nuevo.',
+  EXPIRED_TOKEN: 'Su licencia ha expirado. Por favor, renuévela en la aplicación IKE Licencias.',
+  RENEWABLE_TOKEN: 'Su licencia ha expirado pero puede renovarla en la aplicación IKE Licencias.',
   NETWORK_ERROR: 'Error de conexión. Por favor, verifica tu conexión a internet.',
   SERVER_ERROR: 'Error en el servidor. Por favor, intenta más tarde.'
 };
@@ -27,7 +30,8 @@ const ERROR_MESSAGES = {
 const API_CONFIG = {
   BASE_URL: 'https://ike-license-manager-9b796c40a448.herokuapp.com',
   ENDPOINTS: {
-    VALIDATE_TOKEN: '/api/validate'
+    VALIDATE_TOKEN: '/api/validate',
+    CHECK_VALIDITY: '/api/check-validity'
   },
   HEADERS: {
     'Content-Type': 'application/json'
@@ -222,11 +226,13 @@ class LicenseHandler {
     const expirationDate = moment(storedToken.expiresAt);
 
     if (now.isAfter(expirationDate)) {
-      console.log('Token expirado');
+      console.log('Token expirado pero se conserva para posible renovación');
       return {
         valid: false,
-        status: TOKEN_STATUS.EXPIRED,
-        message: ERROR_MESSAGES.EXPIRED_TOKEN
+        status: TOKEN_STATUS.RENEWABLE,  // Nuevo estado
+        message: ERROR_MESSAGES.RENEWABLE_TOKEN,
+        token: storedToken.token,  // Importante: preservar el token
+        expiresAt: storedToken.expiresAt
       };
     }
 
@@ -248,34 +254,82 @@ class LicenseHandler {
         return {
           valid: false,
           message: 'No hay token almacenado',
-          requiresToken: true  // Añadimos esta bandera
+          requiresToken: true
         };
       }
-  
+    
       // Verificación local de expiración
       const now = moment();
       const expirationDate = moment(storedToken.expiresAt);
-  
-      if (now.isAfter(expirationDate)) {
-        return {
-          valid: false,
-          message: ERROR_MESSAGES.EXPIRED_TOKEN,
-          requiresToken: true  // También aquí
-        };
+      
+      // Si la fecha ha expirado O ha pasado más de 24 horas desde la última verificación
+      // con el servidor, debemos verificar con el servidor
+      const lastVerification = storedToken.lastServerValidation ? 
+        moment(storedToken.lastServerValidation) : null;
+      const needsVerification = !lastVerification || 
+        now.diff(lastVerification, 'hours') >= 24 || 
+        now.isAfter(expirationDate);
+        
+      if (needsVerification) {
+        console.log('Se requiere verificación con el servidor...');
+        
+        try {
+          const serverStatus = await this.validateWithServer();
+          
+          // Si el servidor indica que el token es válido
+          if (serverStatus.valid) {
+            console.log('El servidor indica que el token sigue válido');
+            return {
+              valid: true,
+              token: storedToken.token,
+              expiresAt: storedToken.expiresAt  // Mantenemos la fecha original
+            };
+          }
+          
+          // Si el servidor confirma que no es válido
+          console.log('El servidor confirma que el token no es válido');
+          return {
+            valid: false,
+            message: ERROR_MESSAGES.EXPIRED_TOKEN,
+            requiresToken: true
+          };
+        } catch (serverError) {
+          // Si no podemos conectar con el servidor
+          console.error('Error al verificar con servidor:', serverError.message);
+          
+          // CAMBIO: Si el token ya está expirado localmente y no podemos verificar,
+          // entonces lo consideramos inválido
+          if (now.isAfter(expirationDate)) {
+            return {
+              valid: false,
+              message: ERROR_MESSAGES.RENEWABLE_TOKEN,
+              requiresToken: true
+            };
+          }
+          
+          // Solo permitimos el modo sin conexión si no ha expirado localmente
+          return {
+            valid: true,
+            token: storedToken.token,
+            expiresAt: storedToken.expiresAt,
+            offlineMode: true,
+            message: 'Modo sin conexión: Usando token local temporalmente'
+          };
+        }
       }
-  
+      
+      // Si el token no está expirado localmente y no necesita verificación
       return {
         valid: true,
         token: storedToken.token,
         expiresAt: storedToken.expiresAt
       };
-  
     } catch (error) {
       console.error('Error en checkInitialLicense:', error);
       return {
         valid: false,
         message: error.message || 'Error al verificar la licencia',
-        requiresToken: true  // Y aquí
+        requiresToken: true
       };
     }
   }
@@ -283,40 +337,58 @@ class LicenseHandler {
   async validateWithServer() {
     try {
       const storedToken = this.getStoredToken();
-      console.log('Validando token con servidor:', storedToken?.token);
       
       if (!storedToken || !storedToken.token) {
         console.log('No hay token para validar con el servidor');
         return { valid: false, message: 'No hay token para validar' };
       }
-  
-      console.log('Realizando petición al servidor...');
-      const response = await axios.get(
+    
+      console.log('Consultando si el token está activo...');
+      const validityResponse = await axios.get(
         `${API_CONFIG.BASE_URL}/api/check-validity/${storedToken.token}`,
         { 
           timeout: 10000,
           headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            'Accept': 'application/json'
           }
         }
       );
-  
-      console.log('Respuesta del servidor:', response.data);
-  
-      // La API devuelve true/false directamente
-      const isValid = response.data === true;
       
-      // Ya no borramos el token aquí, solo retornamos el resultado
-      return {
-        valid: isValid,
-        message: isValid ? 'Token válido en servidor' : 'Token inválido en servidor'
-      };
-  
+      console.log('Respuesta de validez:', validityResponse.data);
+      
+      // IMPORTANTE: La respuesta es directamente un valor booleano
+      const isActive = validityResponse.data === true;
+      
+      if (isActive) {
+        console.log('El token está activo según el servidor');
+        
+        // CAMBIO IMPORTANTE: NO modificamos la fecha de expiración local
+        // Solo registramos la fecha de la última validación exitosa
+        const updatedToken = {
+          ...storedToken,
+          lastServerValidation: new Date().toISOString(),
+          verified: true
+        };
+        
+        await this.saveValidatedToken(updatedToken);
+        console.log('Token actualizado con verificación del servidor');
+        
+        return {
+          valid: true,
+          message: 'Token activo en servidor',
+          // Mantenemos la misma fecha de expiración que ya tenía el token
+          expiresAt: storedToken.expiresAt
+        };
+      } else {
+        console.log('El token no está activo según el servidor');
+        return {
+          valid: false,
+          message: 'El token no está activo en el servidor'
+        };
+      }
     } catch (error) {
       console.error('Error en validación con servidor:', error);
       
-      // Si hay error de respuesta del servidor (ej: 404, 500)
       if (error.response) {
         console.error('Respuesta de error del servidor:', error.response.data);
         return { 
@@ -329,7 +401,7 @@ class LicenseHandler {
       if (error.code === 'ECONNABORTED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
         throw new Error('Error de conexión: No se pudo contactar con el servidor de licencias');
       }
-  
+      
       throw new Error(`Error de validación: ${error.message}`);
     }
   }
