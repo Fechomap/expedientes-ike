@@ -5,6 +5,12 @@ asarUnpack: ["**/node_modules/puppeteer-core/**/*"]
 removePackageScripts: true
 compression: "maximum"
 
+# Configuración para actualizaciones automáticas
+publish:
+  provider: s3
+  bucket: ike-expedientes-updates  # Reemplaza con el nombre de tu bucket
+  region: us-east-1  # Reemplaza con tu región
+
 directories:
   output: "dist"
   buildResources: "build"

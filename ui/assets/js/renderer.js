@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusDiv = document.getElementById('status');
     const resultsDiv = document.getElementById('results');
     const progressBar = document.getElementById('progress'); // la barra
+    const checkUpdatesBtn = document.getElementById('checkUpdates');
+    const versionInfoSpan = document.getElementById('versionInfo');
 
     let selectedFilePath = null;
 
@@ -16,8 +18,50 @@ document.addEventListener('DOMContentLoaded', () => {
     progressBar.style.display = 'none';
     progressBar.style.width = '0%';
 
+    // Obtener y mostrar la versión de la aplicación
+    async function displayAppVersion() {
+        try {
+            const version = await window.electronAPI.getAppVersion();
+            versionInfoSpan.textContent = `v${version}`;
+        } catch (error) {
+            console.error('Error al obtener versión:', error);
+        }
+    }
+
+    // Mostrar la versión al cargar
+    displayAppVersion();
+
     // Log inicialización
     console.log('Inicializando interfaz principal...');  
+
+    // Funcionalidad de actualizaciones
+    if (checkUpdatesBtn) {
+        checkUpdatesBtn.addEventListener('click', async () => {
+            try {
+                statusDiv.textContent = 'Verificando actualizaciones...';
+                const result = await window.electronAPI.checkForUpdates();
+                console.log('Resultado de verificación de actualizaciones:', result);
+            } catch (error) {
+                console.error('Error al verificar actualizaciones:', error);
+                statusDiv.textContent = `Error al verificar actualizaciones: ${error.message}`;
+            }
+        });
+    }
+
+    // Eventos de actualización
+    window.electronAPI.onUpdateAvailable((info) => {
+        console.log('Actualización disponible:', info);
+        // Esta notificación se maneja en el proceso principal
+    });
+
+    window.electronAPI.onUpdateProgress((progressObj) => {
+        statusDiv.textContent = `Descargando actualización: ${Math.round(progressObj.percent)}%`;
+    });
+
+    window.electronAPI.onUpdateDownloaded((info) => {
+        console.log('Actualización descargada:', info);
+        // Esta notificación se maneja en el proceso principal
+    });
 
     selectExcelBtn.addEventListener('click', async () => {
         try {

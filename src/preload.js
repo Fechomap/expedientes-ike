@@ -36,5 +36,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
     console.log(`saveConfig invoked with credentials: ${JSON.stringify(credentials)}`);
     const result = await ipcRenderer.invoke('save-config', credentials);
     return result;
+  },
+  // Nuevas funciones para actualizaciones
+  checkForUpdates: async () => {
+    console.log('checkForUpdates invoked');
+    const result = await ipcRenderer.invoke('check-for-updates');
+    return result;
+  },
+  getAppVersion: () => {
+    return ipcRenderer.invoke('get-app-version');
+  },
+  onUpdateAvailable: (callback) => {
+    ipcRenderer.on('update-available', (event, info) => {
+      callback(info);
+    });
+  },
+  onUpdateProgress: (callback) => {
+    ipcRenderer.on('update-progress', (event, progressObj) => {
+      callback(progressObj);
+    });
+  },
+  onUpdateDownloaded: (callback) => {
+    ipcRenderer.on('update-downloaded', (event, info) => {
+      callback(info);
+    });
   }
 });

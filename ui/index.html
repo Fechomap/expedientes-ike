@@ -4,10 +4,40 @@
    <meta charset="UTF-8">
    <title>IKE Expedientes Automation</title>
    <link rel="stylesheet" href="assets/css/styles.css">
+   <style>
+      .update-button {
+         background-color: #6c757d;
+         color: white;
+         padding: 8px 16px;
+         border-radius: 4px;
+         border: none;
+         cursor: pointer;
+         font-size: 0.85rem;
+         margin-left: auto;
+         display: block;
+      }
+      .update-button:hover {
+         background-color: #5a6268;
+      }
+      .header-container {
+         display: flex;
+         align-items: center;
+         margin-bottom: 20px;
+      }
+      .version-info {
+         font-size: 0.85rem;
+         margin-right: 10px;
+         color: #6c757d;
+      }
+   </style>
 </head>
 <body>
    <div class="container">
-       <h1>IKE Expedientes Automation</h1>
+       <div class="header-container">
+           <h1>IKE Expedientes Automation</h1>
+           <span class="version-info" id="versionInfo">v1.0.0</span>
+           <button id="checkUpdates" class="update-button">Buscar Actualizaciones</button>
+       </div>
        
        <div class="control-panel">
            <div class="file-section">

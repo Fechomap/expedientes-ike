@@ -4,6 +4,14 @@ const path = require('path');
 const { processExcelFile } = require('./index');
 const LicenseHandler = require('./utils/licenseHandler');
 const ConfigHandler = require('./utils/configHandler');
+// Agregar estas importaciones
+const { autoUpdater } = require('electron-updater');
+const log = require('electron-log');
+
+// Configurar el logging para las actualizaciones
+log.transports.file.level = 'info';
+autoUpdater.logger = log;
+autoUpdater.autoDownload = false;
 
 const licenseHandler = new LicenseHandler();
 const configHandler = new ConfigHandler();
@@ -188,11 +196,88 @@ async function createMainWindow() {
   }
 }
 
+// Configuración del auto-actualizador
+function setupAutoUpdater() {
+  // Verificar actualizaciones al iniciar
+  autoUpdater.checkForUpdates();
+  
+  // Evento cuando hay una actualización disponible
+  autoUpdater.on('update-available', (info) => {
+    console.log('Actualización disponible:', info);
+    
+    // Notificar al usuario y preguntar si quiere actualizar
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Actualización Disponible',
+      message: `Versión ${info.version} disponible.`,
+      detail: '¿Desea descargar e instalar la actualización ahora?',
+      buttons: ['Descargar', 'Más tarde']
+    }).then(({ response }) => {
+      if (response === 0) {
+        autoUpdater.downloadUpdate();
+      }
+    });
+    
+    // Enviar el evento a la ventana principal
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-available', info);
+    }
+  });
+
+  // Error en la actualización
+  autoUpdater.on('error', (err) => {
+    console.error('Error en actualización:', err);
+    dialog.showMessageBox({
+      type: 'error',
+      title: 'Error de Actualización',
+      message: 'Ocurrió un error al buscar actualizaciones.',
+      detail: err.message
+    });
+  });
+
+  // Progreso de descarga
+  autoUpdater.on('download-progress', (progressObj) => {
+    let logMessage = `Velocidad: ${progressObj.bytesPerSecond} - Descargado: ${progressObj.percent}%`;
+    console.log(logMessage);
+    
+    // Enviar el evento a la ventana principal
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-progress', progressObj);
+    }
+  });
+
+  // Actualización descargada
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('Actualización descargada');
+    
+    // Notificar al usuario que la actualización se instalará al reiniciar
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Actualización Lista',
+      message: 'La actualización se ha descargado.',
+      detail: 'La aplicación se reiniciará para instalar la actualización.',
+      buttons: ['Reiniciar ahora', 'Más tarde']
+    }).then(({ response }) => {
+      if (response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
+    
+    // Enviar el evento a la ventana principal
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-downloaded', info);
+    }
+  });
+}
+
 app.whenReady().then(async () => {
   try {
     console.log('Aplicación lista, creando ventana de carga...');
     loadingWindow = await createLoadingWindow();
     console.log('Ventana de carga creada exitosamente');
+
+    // Configurar actualizador automático
+    setupAutoUpdater();
 
     // Simular tiempo de carga
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -401,6 +486,23 @@ ipcMain.handle('app:reload', async () => {
   } catch (error) {
     console.error('Error al recargar la aplicación:', error);
     console.log(`Error al recargar la aplicación: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+});
+
+// Exponer la versión de la aplicación (ya estaba implementado)
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
+// Manejador para verificar actualizaciones manualmente
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    console.log('Verificando actualizaciones manualmente...');
+    autoUpdater.checkForUpdates();
+    return { success: true, message: 'Verificando actualizaciones...' };
+  } catch (error) {
+    console.error('Error al verificar actualizaciones:', error);
     return { success: false, error: error.message };
   }
 });

@@ -13,25 +13,20 @@
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "publish": "electron-builder -p always",
+    "publish:win": "electron-builder --win -p always",
+    "publish:mac": "electron-builder --mac -p always",
+    "publish:linux": "electron-builder --linux -p always"
   },
-  "keywords": [
-    "electron",
-    "automation",
-    "ike",
-    "expedientes"
-  ],
-  "author": {
-    "name": "IKE Asistencia",
-    "email": "soporte@ikeasistencia.com"
-  },
-  "license": "ISC",
   "dependencies": {
     "asar": "^3.2.0",
     "axios": "^1.7.9",
     "crypto-js": "^4.2.0",
     "dotenv": "^16.4.7",
+    "electron-log": "^4.4.8",
     "electron-store": "^8.2.0",
+    "electron-updater": "^6.1.7",
     "exceljs": "^4.4.0",
     "express": "^4.21.2",
     "moment": "^2.30.1",
@@ -64,6 +59,13 @@
       "output": "dist",
       "buildResources": "build"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Fechomap",
+        "repo": "expedientes-ike"
+      }
+    ],
     "mac": {
       "category": "public.app-category.business",
       "target": [
