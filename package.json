@@ -38,17 +38,14 @@
     "cross-env": "^7.0.3",
     "electron": "^28.0.0",
     "electron-builder": "^24.0.0",
+    "glob": "^11.0.1",
     "javascript-obfuscator": "^4.1.1",
     "rimraf": "^5.0.10"
   },
   "build": {
     "appId": "com.ike.expedientes",
     "productName": "IKE Expedientes Automation",
-    "copyright": "Copyright © 2024 IKE Asistencia",
     "asar": true,
-    "asarUnpack": [
-      "**/node_modules/puppeteer-core/**/*"
-    ],
     "files": [
       "src/**/*",
       "ui/**/*",
@@ -61,16 +58,17 @@
     },
     "publish": [
       {
-        "provider": "github",
-        "owner": "Fechomap",
-        "repo": "expedientes-ike"
+        "provider": "s3",
+        "bucket": "ike-expedientes-updates",
+        "region": "us-east-1",
+        "path": "releases/",
+        "channel": "latest",
+        "acl": "public-read"
       }
     ],
     "mac": {
       "category": "public.app-category.business",
-      "target": [
-        "dmg"
-      ],
+      "target": ["dmg"],
       "icon": "build/icon.icns",
       "hardenedRuntime": true
     },
@@ -78,9 +76,7 @@
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         }
       ],
       "icon": "build/icon.ico",
