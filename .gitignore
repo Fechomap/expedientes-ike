@@ -14,4 +14,7 @@ data/*
 !data/.gitkeep
 
 # Carpetas de distribución o compilación (si las usas)
-/dist
+/dist.DS_Store
+.DS_Store
+LOCAL/
+dist/
