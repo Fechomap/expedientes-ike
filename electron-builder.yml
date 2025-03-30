@@ -8,8 +8,11 @@ compression: "maximum"
 # Configuración para actualizaciones automáticas
 publish:
   provider: s3
-  bucket: ike-expedientes-updates  # Reemplaza con el nombre de tu bucket
-  region: us-east-1  # Reemplaza con tu región
+  bucket: ike-expedientes-updates
+  region: us-east-1
+  path: "/"
+  # Eliminamos la opción acl porque el bucket no soporta ACLs
+  channel: latest
 
 directories:
   output: "dist"

@@ -11,7 +11,9 @@ const log = require('electron-log');
 // Configurar el logging para las actualizaciones
 log.transports.file.level = 'info';
 autoUpdater.logger = log;
-autoUpdater.autoDownload = false;
+autoUpdater.logger.transports.file.level = 'info';
+log.info('Aplicación iniciando...');
+autoUpdater.autoDownload = false; // Mantener en false para solicitar permiso al usuario
 
 const licenseHandler = new LicenseHandler();
 const configHandler = new ConfigHandler();
@@ -198,12 +200,33 @@ async function createMainWindow() {
 
 // Configuración del auto-actualizador
 function setupAutoUpdater() {
+  log.info('Configurando auto-actualizador');
+  
   // Verificar actualizaciones al iniciar
-  autoUpdater.checkForUpdates();
+  try {
+    log.info('Iniciando verificación de actualizaciones');
+    autoUpdater.checkForUpdates().catch(err => {
+      log.error('Error inicial al verificar actualizaciones:', err);
+    });
+  } catch (error) {
+    log.error('Error al iniciar verificación de actualizaciones:', error);
+  }
+  
+  // Configurar verificación periódica (cada 4 horas)
+  setInterval(() => {
+    try {
+      log.info('Verificación periódica de actualizaciones');
+      autoUpdater.checkForUpdates().catch(err => {
+        log.error('Error en verificación periódica:', err);
+      });
+    } catch (error) {
+      log.error('Error al iniciar verificación periódica:', error);
+    }
+  }, 4 * 60 * 60 * 1000);
   
   // Evento cuando hay una actualización disponible
   autoUpdater.on('update-available', (info) => {
-    console.log('Actualización disponible:', info);
+    log.info('Actualización disponible:', info);
     
     // Notificar al usuario y preguntar si quiere actualizar
     dialog.showMessageBox({
@@ -214,7 +237,12 @@ function setupAutoUpdater() {
       buttons: ['Descargar', 'Más tarde']
     }).then(({ response }) => {
       if (response === 0) {
-        autoUpdater.downloadUpdate();
+        log.info('Usuario aceptó descargar actualización');
+        autoUpdater.downloadUpdate().catch(err => {
+          log.error('Error al descargar actualización:', err);
+        });
+      } else {
+        log.info('Usuario pospuso la actualización');
       }
     });
     
@@ -224,21 +252,27 @@ function setupAutoUpdater() {
     }
   });
 
+  // No hay actualizaciones disponibles
+  autoUpdater.on('update-not-available', (info) => {
+    log.info('No hay actualizaciones disponibles:', info);
+  });
+
   // Error en la actualización
   autoUpdater.on('error', (err) => {
-    console.error('Error en actualización:', err);
+    log.error('Error en actualización:', err);
+    
     dialog.showMessageBox({
       type: 'error',
       title: 'Error de Actualización',
       message: 'Ocurrió un error al buscar actualizaciones.',
-      detail: err.message
+      detail: err.message || 'Error desconocido'
     });
   });
 
   // Progreso de descarga
   autoUpdater.on('download-progress', (progressObj) => {
     let logMessage = `Velocidad: ${progressObj.bytesPerSecond} - Descargado: ${progressObj.percent}%`;
-    console.log(logMessage);
+    log.info(logMessage);
     
     // Enviar el evento a la ventana principal
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -248,7 +282,7 @@ function setupAutoUpdater() {
 
   // Actualización descargada
   autoUpdater.on('update-downloaded', (info) => {
-    console.log('Actualización descargada');
+    log.info('Actualización descargada:', info);
     
     // Notificar al usuario que la actualización se instalará al reiniciar
     dialog.showMessageBox({
@@ -259,7 +293,10 @@ function setupAutoUpdater() {
       buttons: ['Reiniciar ahora', 'Más tarde']
     }).then(({ response }) => {
       if (response === 0) {
-        autoUpdater.quitAndInstall();
+        log.info('Instalando actualización y reiniciando aplicación');
+        autoUpdater.quitAndInstall(true, true);
+      } else {
+        log.info('Usuario pospuso la instalación de la actualización');
       }
     });
     
@@ -498,12 +535,42 @@ ipcMain.handle('get-app-version', () => {
 // Manejador para verificar actualizaciones manualmente
 ipcMain.handle('check-for-updates', async () => {
   try {
-    console.log('Verificando actualizaciones manualmente...');
-    autoUpdater.checkForUpdates();
-    return { success: true, message: 'Verificando actualizaciones...' };
+    log.info('Verificando actualizaciones manualmente...');
+    
+    // Mostrar diálogo de búsqueda de actualizaciones
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Verificando Actualizaciones',
+      message: 'Buscando actualizaciones...',
+      detail: 'Por favor espere mientras verificamos si hay actualizaciones disponibles.',
+      buttons: ['OK']
+    });
+    
+    // Verificar actualizaciones y retornar resultado
+    const checkResult = await autoUpdater.checkForUpdates();
+    log.info('Resultado de verificación manual:', checkResult);
+    
+    return { 
+      success: true, 
+      message: 'Verificación de actualizaciones completada',
+      result: checkResult
+    };
   } catch (error) {
-    console.error('Error al verificar actualizaciones:', error);
-    return { success: false, error: error.message };
+    log.error('Error al verificar actualizaciones manualmente:', error);
+    
+    // Mostrar error al usuario
+    dialog.showMessageBox({
+      type: 'error',
+      title: 'Error',
+      message: 'No se pudieron verificar las actualizaciones',
+      detail: error.message || 'Error desconocido al verificar actualizaciones',
+      buttons: ['OK']
+    });
+    
+    return { 
+      success: false, 
+      error: error.message || 'Error desconocido' 
+    };
   }
 });
 
