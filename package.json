@@ -62,8 +62,7 @@
         "bucket": "ike-expedientes-updates",
         "region": "us-east-1",
         "path": "releases/",
-        "channel": "latest",
-        "acl": "public-read"
+        "channel": "latest"
       }
     ],
     "mac": {
