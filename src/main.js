@@ -13,7 +13,8 @@ log.transports.file.level = 'info';
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = 'info';
 log.info('Aplicación iniciando...');
-autoUpdater.autoDownload = false; // Mantener en false para solicitar permiso al usuario
+autoUpdater.autoDownload = true; // Descargar actualizaciones automáticamente
+autoUpdater.autoInstallOnAppQuit = true; // Instalar al salir de la aplicación
 
 const licenseHandler = new LicenseHandler();
 const configHandler = new ConfigHandler();
@@ -228,22 +229,13 @@ function setupAutoUpdater() {
   autoUpdater.on('update-available', (info) => {
     log.info('Actualización disponible:', info);
     
-    // Notificar al usuario y preguntar si quiere actualizar
+    // Notificar al usuario que se está descargando una actualización
     dialog.showMessageBox({
       type: 'info',
       title: 'Actualización Disponible',
       message: `Versión ${info.version} disponible.`,
-      detail: '¿Desea descargar e instalar la actualización ahora?',
-      buttons: ['Descargar', 'Más tarde']
-    }).then(({ response }) => {
-      if (response === 0) {
-        log.info('Usuario aceptó descargar actualización');
-        autoUpdater.downloadUpdate().catch(err => {
-          log.error('Error al descargar actualización:', err);
-        });
-      } else {
-        log.info('Usuario pospuso la actualización');
-      }
+      detail: 'La actualización se está descargando automáticamente. Será instalada cuando cierre la aplicación.',
+      buttons: ['OK']
     });
     
     // Enviar el evento a la ventana principal
@@ -289,14 +281,14 @@ function setupAutoUpdater() {
       type: 'info',
       title: 'Actualización Lista',
       message: 'La actualización se ha descargado.',
-      detail: 'La aplicación se reiniciará para instalar la actualización.',
+      detail: 'La aplicación se actualizará automáticamente cuando la cierre. ¿Desea reiniciar ahora para aplicar la actualización?',
       buttons: ['Reiniciar ahora', 'Más tarde']
     }).then(({ response }) => {
       if (response === 0) {
         log.info('Instalando actualización y reiniciando aplicación');
         autoUpdater.quitAndInstall(true, true);
       } else {
-        log.info('Usuario pospuso la instalación de la actualización');
+        log.info('Usuario eligió actualizar más tarde (al cerrar la aplicación)');
       }
     });
     
