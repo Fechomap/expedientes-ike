@@ -32,17 +32,37 @@ class LicenseHandler {
         const fileContent = fs.readFileSync(filePath, 'utf8');
         JSON.parse(fileContent);
       } catch (error) {
-        this.log.error('Archivo de configuración corrupto. Se eliminará para evitar conflictos.', error);
-        fs.unlinkSync(filePath); // Elimina el archivo corrupto
+        // En lugar de eliminar el archivo, registramos el error y haremos una copia de respaldo
+        this.log.error('Archivo de configuración posiblemente corrupto:', error);
+        
+        // Crear una copia de respaldo antes de continuar
+        try {
+          const backupPath = `${filePath}.backup.${Date.now()}`;
+          fs.copyFileSync(filePath, backupPath);
+          this.log.info(`Copia de seguridad creada en: ${backupPath}`);
+        } catch (backupError) {
+          this.log.error('Error al crear copia de seguridad:', backupError);
+        }
       }
     }
 
-    // Crear la instancia de electron-store
-    this.store = new Store({
-      name: 'license',
-      // Agregar encriptación opcional para mayor seguridad
-      encryptionKey: 'ike-secure-key-2024'
-    });
+    // Crear la instancia de electron-store con manejo de errores mejorado
+    try {
+      this.store = new Store({
+        name: 'license',
+        // Agregar encriptación opcional para mayor seguridad
+        encryptionKey: 'ike-secure-key-2024',
+        // Agregar función para manejar errores de deserialización
+        clearInvalidConfig: true
+      });
+    } catch (storeError) {
+      this.log.error('Error al inicializar electron-store:', storeError);
+      // Si hay error, intentamos crear con opciones mínimas
+      this.store = new Store({
+        name: 'license',
+        clearInvalidConfig: true
+      });
+    }
     
     this.client = null;
     this.checkInterval = null;
@@ -104,16 +124,53 @@ class LicenseHandler {
         appVersion: app.getVersion()
       };
       
-      this.store.set('validatedToken', enrichedTokenData);
-      this.log.info('Token guardado exitosamente:', tokenData.token);
+      // Verificar si hay un token existente - obtener copia antes de modificar
+      let existingToken = null;
+      try {
+        existingToken = this.store.get('validatedToken');
+      } catch (readError) {
+        this.log.warn('No se pudo leer el token existente:', readError);
+        // Continuamos con el guardado de todas formas
+      }
+      
+      // Guardar nuevo token con manejo de errores mejorado
+      try {
+        this.store.set('validatedToken', enrichedTokenData);
+        this.log.info('Token guardado exitosamente:', tokenData.token);
+      } catch (saveError) {
+        this.log.error('Error al guardar el token en electron-store:', saveError);
+        
+        // Intentar guardar una copia del token en formato JSON plano como respaldo
+        try {
+          const backupPath = path.join(app.getPath('userData'), `license_backup_${Date.now()}.json`);
+          fs.writeFileSync(backupPath, JSON.stringify(enrichedTokenData, null, 2), 'utf8');
+          this.log.info(`Token guardado como respaldo en: ${backupPath}`);
+        } catch (backupError) {
+          this.log.error('Error al crear respaldo del token:', backupError);
+        }
+        
+        // Reintento con opciones mínimas
+        try {
+          this.store = new Store({
+            name: 'license',
+            clearInvalidConfig: true
+          });
+          this.store.set('validatedToken', enrichedTokenData);
+          this.log.info('Token guardado en segundo intento con opciones mínimas');
+        } catch (retryError) {
+          this.log.error('Error en segundo intento de guardado:', retryError);
+          return false;
+        }
+      }
+      
       return true;
     } catch (error) {
-      this.log.error('Error al guardar el token:', error);
+      this.log.error('Error general al guardar el token:', error);
       return false;
     }
   }
 
-  // Método para obtener el token guardado
+  // Método para obtener el token guardado con recuperación mejorada
   getStoredToken() {
     try {
       const tokenData = this.store.get('validatedToken');
@@ -121,10 +178,69 @@ class LicenseHandler {
         this.log.info('Token almacenado encontrado, expira:', tokenData.expiresAt);
         return tokenData;
       }
-      this.log.info('No se encontró token almacenado');
-      return null;
+      this.log.info('No se encontró token almacenado en electron-store');
+      
+      // Si no hay token en electron-store, intentar buscar en archivos de respaldo
+      return this.attemptTokenRecovery();
     } catch (error) {
       this.log.error('Error al obtener el token guardado:', error);
+      
+      // Intentar recuperar desde respaldo
+      return this.attemptTokenRecovery();
+    }
+  }
+  
+  // Método auxiliar para intentar recuperar token desde archivos de respaldo
+  attemptTokenRecovery() {
+    try {
+      this.log.info('Intentando recuperar token desde archivos de respaldo...');
+      const userData = app.getPath('userData');
+      
+      // Buscar archivos de respaldo
+      const files = fs.readdirSync(userData)
+        .filter(file => file.startsWith('license_backup_') && file.endsWith('.json'))
+        .sort()
+        .reverse(); // Más recientes primero
+      
+      if (files.length === 0) {
+        this.log.info('No se encontraron archivos de respaldo');
+        return null;
+      }
+      
+      // Intentar leer cada archivo hasta encontrar uno válido
+      for (const file of files) {
+        try {
+          const filePath = path.join(userData, file);
+          const content = fs.readFileSync(filePath, 'utf8');
+          const tokenData = JSON.parse(content);
+          
+          if (tokenData && tokenData.token) {
+            this.log.info(`Token recuperado desde respaldo: ${file}`);
+            
+            // Guardar el token recuperado en electron-store
+            this.saveValidatedToken(tokenData)
+              .then(success => {
+                if (success) {
+                  this.log.info('Token recuperado guardado en electron-store');
+                }
+              })
+              .catch(err => {
+                this.log.error('Error al guardar token recuperado:', err);
+              });
+            
+            return tokenData;
+          }
+        } catch (e) {
+          this.log.error(`Error al leer archivo de respaldo ${file}:`, e);
+          // Continuar con el siguiente archivo
+          continue;
+        }
+      }
+      
+      this.log.info('No se pudo recuperar token desde archivos de respaldo');
+      return null;
+    } catch (error) {
+      this.log.error('Error en proceso de recuperación de token:', error);
       return null;
     }
   }
@@ -326,10 +442,12 @@ class LicenseHandler {
   }
 
   // Método mejorado para la verificación de licencia inicial
+  // Método mejorado para la verificación de licencia inicial
   async checkInitialLicense() {
     try {
       const storedToken = this.getStoredToken();
       
+      // Si no hay token almacenado, solicitar uno nuevo
       if (!storedToken || !storedToken.token) {
         return {
           valid: false,
@@ -338,84 +456,94 @@ class LicenseHandler {
         };
       }
     
-      // Verificación local de expiración
-      const now = moment();
-      const expirationDate = moment(storedToken.expiresAt);
-      
-      // Si la fecha ha expirado O ha pasado más de 24 horas desde la última verificación
-      // con el servidor, debemos verificar con el servidor
-      const lastVerification = storedToken.lastServerValidation ? 
-        moment(storedToken.lastServerValidation) : null;
-      const needsVerification = !lastVerification || 
-        now.diff(lastVerification, 'hours') >= 24 || 
-        now.isAfter(expirationDate);
+      // No importa si el token ha expirado localmente, siempre intentaremos 
+      // verificar con el servidor primero para saber si se ha renovado
+      try {
+        this.log.info('Verificando token con el servidor independientemente de la fecha local...');
+        const serverStatus = await this.validateWithServer();
         
-      if (needsVerification) {
-        this.log.info('Se requiere verificación con el servidor...');
-        
-        try {
-          const serverStatus = await this.validateWithServer();
+        // Si el servidor indica que el token es válido (se ha renovado o sigue activo)
+        if (serverStatus.valid) {
+          this.log.info('El servidor confirma que el token es válido');
           
-          // Si el servidor indica que el token es válido
-          if (serverStatus.valid) {
-            this.log.info('El servidor indica que el token sigue válido');
-            return {
-              valid: true,
-              token: storedToken.token,
-              expiresAt: storedToken.expiresAt
+          // Actualizar la fecha de expiración si viene en la respuesta
+          if (serverStatus.expiresAt) {
+            const updatedToken = {
+              ...storedToken,
+              expiresAt: serverStatus.expiresAt,
+              lastServerValidation: new Date().toISOString()
             };
+            
+            await this.saveValidatedToken(updatedToken);
+            this.log.info('Token actualizado con nueva fecha de expiración');
           }
           
-          // Si el servidor confirma que no es válido
-          this.log.info('El servidor confirma que el token no es válido');
-          return {
-            valid: false,
-            message: ERROR_MESSAGES.EXPIRED_TOKEN,
-            requiresToken: true
-          };
-        } catch (serverError) {
-          // Si no podemos conectar con el servidor
-          this.log.error('Error al verificar con servidor:', serverError.message);
-          
-          // Si el token ya está expirado localmente y no podemos verificar,
-          // entonces lo consideramos inválido
-          if (now.isAfter(expirationDate)) {
-            return {
-              valid: false,
-              message: ERROR_MESSAGES.RENEWABLE_TOKEN,
-              requiresToken: true,
-              expired: true,
-              renewable: true
-            };
-          }
-          
-          // Solo permitimos el modo sin conexión si no ha expirado localmente
           return {
             valid: true,
             token: storedToken.token,
-            expiresAt: storedToken.expiresAt,
-            offlineMode: true,
-            message: 'Modo sin conexión: Usando token local temporalmente'
+            expiresAt: serverStatus.expiresAt || storedToken.expiresAt
           };
         }
+        
+        // Si el servidor indica que el token ya no es válido
+        this.log.info('El servidor indica que el token no es válido');
+        
+        // IMPORTANTE: NO eliminamos el token local aunque sea inválido
+        // simplemente lo marcamos como inválido para que el usuario pueda renovarlo
+        return {
+          valid: false,
+          message: 'La licencia no está activa. Por favor, renuévela en la aplicación IKE Licencias.',
+          requiresToken: true,
+          token: storedToken.token  // Mantenemos el token para referencia
+        };
+      } catch (serverError) {
+        // Si no podemos conectar con el servidor
+        this.log.error('Error al verificar con servidor:', serverError.message);
+        
+        // En modo offline, verificamos la fecha local como respaldo
+        const now = moment();
+        const expirationDate = moment(storedToken.expiresAt);
+        
+        // Si el token ya está expirado localmente y no podemos verificar,
+        // lo consideramos válido temporalmente para permitir el uso offline
+        // Esto es un cambio clave: asumimos que es válido hasta que podamos verificar online
+        if (now.isAfter(expirationDate)) {
+          this.log.info('Token expirado localmente, pero permitiendo modo offline temporal');
+          return {
+            valid: true,  // Consideramos válido para modo offline
+            token: storedToken.token,
+            expiresAt: storedToken.expiresAt,
+            offlineMode: true,
+            message: 'Modo sin conexión: Usando licencia existente temporalmente. Se verificará cuando haya conexión a internet.'
+          };
+        }
+        
+        // Si no ha expirado localmente, lo consideramos válido en modo offline
+        return {
+          valid: true,
+          token: storedToken.token,
+          expiresAt: storedToken.expiresAt,
+          offlineMode: true,
+          message: 'Modo sin conexión: Usando token local temporalmente'
+        };
       }
-      
-      // Si el token no está expirado localmente y no necesita verificación
-      const daysUntilExpiration = expirationDate.diff(now, 'days');
-      const warning = daysUntilExpiration <= this.EXPIRATION_WARNING_DAYS;
-      
-      return {
-        valid: true,
-        token: storedToken.token,
-        expiresAt: storedToken.expiresAt,
-        message: warning ? 
-          `Token válido, expira en ${daysUntilExpiration} días` : 
-          'Token válido',
-        warning,
-        daysUntilExpiration
-      };
     } catch (error) {
       this.log.error('Error en checkInitialLicense:', error);
+      
+      // Si ocurre algún error, intentamos usar el token local como último recurso
+      const storedToken = this.getStoredToken();
+      if (storedToken && storedToken.token) {
+        this.log.info('Usando token local como último recurso debido a error');
+        return {
+          valid: true,
+          token: storedToken.token,
+          expiresAt: storedToken.expiresAt,
+          offlineMode: true,
+          emergencyMode: true,
+          message: 'Modo de emergencia: Usando token local'
+        };
+      }
+      
       return {
         valid: false,
         message: error.message || 'Error al verificar la licencia',
@@ -424,6 +552,7 @@ class LicenseHandler {
     }
   }
   
+  // Método mejorado para validar con el servidor
   // Método mejorado para validar con el servidor
   async validateWithServer() {
     try {
@@ -434,7 +563,7 @@ class LicenseHandler {
         return { valid: false, message: 'No hay token para validar' };
       }
     
-      this.log.info('Consultando si el token está activo...');
+      this.log.info('Consultando si el token está activo en el servidor:', storedToken.token);
       
       // Usar el método apiRequest con reintentos
       const validityResponse = await this.apiRequest(
@@ -442,7 +571,7 @@ class LicenseHandler {
         'get'
       );
       
-      this.log.info('Respuesta de validez:', validityResponse);
+      this.log.info('Respuesta de validez del servidor:', JSON.stringify(validityResponse));
       
       // Analizar la respuesta
       const isActive = validityResponse === true || validityResponse.success === true;
@@ -450,11 +579,13 @@ class LicenseHandler {
       if (isActive) {
         this.log.info('El token está activo según el servidor');
         
-        // Actualización del token
+        // Actualización del token para reflejar que está activo
         const updatedToken = {
           ...storedToken,
           lastServerValidation: new Date().toISOString(),
-          verified: true
+          verified: true,
+          // Si el servidor proporciona una nueva fecha de expiración, la actualizamos
+          expiresAt: validityResponse.expiresAt || storedToken.expiresAt
         };
         
         await this.saveValidatedToken(updatedToken);
@@ -463,13 +594,18 @@ class LicenseHandler {
         return {
           valid: true,
           message: 'Token activo en servidor',
-          expiresAt: storedToken.expiresAt
+          expiresAt: updatedToken.expiresAt
         };
       } else {
         this.log.info('El token no está activo según el servidor');
+        
+        // IMPORTANTE: No eliminamos el token, solo marcamos que no está activo
+        // para permitir la renovación posterior
         return {
           valid: false,
-          message: validityResponse.message || 'El token no está activo en el servidor'
+          message: validityResponse.message || 'El token no está activo en el servidor',
+          // Incluimos el token para referencia
+          token: storedToken.token
         };
       }
     } catch (error) {
@@ -585,6 +721,169 @@ class LicenseHandler {
       return { valid: false, message: 'Error al validar licencia' };
     } finally {
       await this.disconnect();
+    }
+  }
+
+    // Método para redimir token (agregarlo a la clase LicenseHandler en src/utils/licenseHandler.js)
+
+  /**
+   * Redime un token enviando una solicitud POST al servidor
+   * @param {string} token - El token a redimir
+   * @returns {Promise<Object>} - Resultado de la redención del token
+   */
+  async redeemToken(token) {
+    try {
+      if (!token || token.trim() === '') {
+        return {
+          valid: false,
+          status: TOKEN_STATUS.INVALID,
+          message: ERROR_MESSAGES.EMPTY_TOKEN
+        };
+      }
+      
+      this.log.info('Intentando redimir token:', token);
+      
+      const deviceInfo = this.getDeviceInfo();
+      const machineId = this.generateMachineId();
+      const deviceInfoString = JSON.stringify(deviceInfo);
+      
+      // Crear la URL para la solicitud POST de redención
+      const redeemUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.REDEEM_TOKEN}`;
+      
+      // Usar el método apiRequest con reintentos para redimir el token
+      const response = await this.apiRequest(
+        redeemUrl,
+        'post',
+        {
+          token,
+          machineId,
+          deviceInfo: deviceInfoString
+        }
+      );
+      
+      this.log.info('Respuesta de redención de token:', JSON.stringify(response));
+      
+      if (response.success) {
+        // Si la redención es exitosa, guardamos el token validado
+        const tokenData = {
+          token,
+          machineId,
+          deviceInfo: deviceInfoString,
+          expiresAt: response.expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: new Date().toISOString(),
+          lastValidation: new Date().toISOString(),
+          redeemed: true,
+          redemptionDate: new Date().toISOString()
+        };
+        
+        // Guardar el token redimido
+        await this.saveValidatedToken(tokenData);
+        
+        return {
+          valid: true,
+          status: TOKEN_STATUS.VALID,
+          expiresAt: tokenData.expiresAt,
+          message: 'Token redimido correctamente'
+        };
+      }
+      
+      // Si la respuesta no es exitosa
+      return {
+        valid: false,
+        status: response.status === 403 ? TOKEN_STATUS.EXPIRED : TOKEN_STATUS.INVALID,
+        message: response.message || ERROR_MESSAGES.INVALID_TOKEN
+      };
+      
+    } catch (error) {
+      this.log.error('Error inesperado al redimir token:', error);
+      
+      return {
+        valid: false,
+        status: TOKEN_STATUS.INVALID,
+        message: ERROR_MESSAGES.VALIDATION_ERROR
+      };
+    }
+  }
+
+  // Método modificado de verificación de token para usar redimirToken
+  // (modificar el método existente validateToken en la clase LicenseHandler)
+  async validateToken(token) {
+    if (!token || token.trim() === '') {
+      return {
+        valid: false,
+        status: TOKEN_STATUS.INVALID,
+        message: ERROR_MESSAGES.EMPTY_TOKEN
+      };
+    }
+    
+    try {
+      this.log.info('Validando token:', token);
+      
+      // 1. Primero intentar redimir el token (nueva funcionalidad)
+      const redeemResult = await this.redeemToken(token);
+      this.log.info('Resultado de redención:', JSON.stringify(redeemResult));
+      
+      // Si la redención fue exitosa, retornamos el resultado
+      if (redeemResult.valid) {
+        return redeemResult;
+      }
+      
+      // 2. Si la redención falla, intentar la validación estándar como fallback
+      this.log.info('Redención falló, intentando validación estándar...');
+      
+      const deviceInfo = this.getDeviceInfo();
+      const machineId = this.generateMachineId();
+      const deviceInfoString = JSON.stringify(deviceInfo);
+      
+      // Usar el método apiRequest con reintentos
+      const response = await this.apiRequest(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.VALIDATE_TOKEN}`,
+        'post',
+        {
+          token,
+          machineId,
+          deviceInfo: deviceInfoString
+        }
+      );
+      
+      this.log.info('Respuesta de validación de token:', JSON.stringify(response));
+      
+      if (response.success) {
+        const tokenData = {
+          token,
+          machineId,
+          deviceInfo: deviceInfoString,
+          expiresAt: response.expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: new Date().toISOString(),
+          lastValidation: new Date().toISOString()
+        };
+        
+        // Guardar el token validado
+        await this.saveValidatedToken(tokenData);
+        
+        return {
+          valid: true,
+          status: TOKEN_STATUS.VALID,
+          expiresAt: tokenData.expiresAt,
+          message: 'Token validado correctamente'
+        };
+      }
+      
+      // Si la respuesta no es exitosa
+      return {
+        valid: false,
+        status: response.status === 403 ? TOKEN_STATUS.EXPIRED : TOKEN_STATUS.INVALID,
+        message: response.message || ERROR_MESSAGES.INVALID_TOKEN
+      };
+      
+    } catch (error) {
+      this.log.error('Error inesperado al validar token:', error);
+      
+      return {
+        valid: false,
+        status: TOKEN_STATUS.INVALID,
+        message: ERROR_MESSAGES.VALIDATION_ERROR
+      };
     }
   }
 

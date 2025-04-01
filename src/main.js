@@ -69,56 +69,89 @@ async function verificarLicenciaInicial() {
 
     // Si no hay token local o es inválido, redirigir a pantalla de licencia
     if (!tokenResult.valid) {
-      // Si el token está expirado pero es renovable
-      if (tokenResult.expired && tokenResult.renewable) {
-        // Mostrar mensaje indicando que debe renovarse en IKE Licencias
+      // Cambio importante: Si estamos en modo offline o emergencia, permitimos continuar
+      if (tokenResult.offlineMode || tokenResult.emergencyMode) {
+        console.log('Permitiendo acceso en modo offline o emergencia');
+        // 3. Verificar credenciales
+        const credentials = configHandler.getCredentials();
+        
+        if (!credentials) {
+          console.log('No hay credenciales configuradas');
+          return { valid: false, requiresConfig: true };
+        }
+        
+        return { valid: true };
+      }
+      
+      // Si el token está expirado pero es renovable o está en modo offline
+      if ((tokenResult.expired && tokenResult.renewable) || tokenResult.offlineMode) {
+        console.log('Token en estado especial (renovable/offline), permitiendo acceso temporal');
+        
+        // Mostrar mensaje informativo pero permitir continuar
         await dialog.showMessageBox({
           type: 'warning',
-          title: 'Licencia Expirada',
-          message: tokenResult.message,
-          detail: 'Por favor, renueve su licencia en la aplicación IKE Licencias y luego reinicie esta aplicación.',
-          buttons: ['OK']
+          title: 'Estado de Licencia',
+          message: tokenResult.message || 'Su licencia requiere atención',
+          detail: 'La aplicación funcionará temporalmente. Por favor, asegúrese de tener conexión a internet para una validación completa.',
+          buttons: ['Continuar']
         });
         
-        // Aquí no direccionamos a la pantalla de token, simplemente cerramos la app
-        app.quit();
-        return null;
+        // 3. Verificar credenciales
+        const credentials = configHandler.getCredentials();
+        
+        if (!credentials) {
+          console.log('No hay credenciales configuradas');
+          return { valid: false, requiresConfig: true };
+        }
+        
+        return { valid: true };
       }
       
       // Para otros casos de token inválido, procedemos normalmente
       return { valid: false, requiresToken: true };
     }
 
-    // 2. Validación explícita con el servidor
-    console.log('Iniciando validación con el servidor...');
-    try {
-      const serverValidation = await licenseHandler.validateWithServer();
-      console.log('Resultado de validación con servidor:', serverValidation);
-      
-      // Si el servidor invalida el token, redirigir a pantalla de licencia
-      if (!serverValidation.valid) {
-        console.log('Token invalidado por el servidor');
-        return { valid: false, requiresToken: true };
+    // 2. Validación explícita con el servidor si no estamos en modo offline
+    if (!tokenResult.offlineMode) {
+      console.log('Iniciando validación con el servidor...');
+      try {
+        const serverValidation = await licenseHandler.validateWithServer();
+        console.log('Resultado de validación con servidor:', serverValidation);
+        
+        // Si el servidor invalida el token, pero estamos en modo offline o emergencia
+        if (!serverValidation.valid && (tokenResult.offlineMode || tokenResult.emergencyMode)) {
+          console.log('Servidor invalidó el token, pero permitiendo acceso en modo offline/emergencia');
+          
+          // Mostrar advertencia pero permitir continuar
+          await dialog.showMessageBox({
+            type: 'warning',
+            title: 'Licencia en Modo Offline',
+            message: 'No se pudo validar completamente la licencia',
+            detail: 'La aplicación funcionará temporalmente en modo offline. Por favor, verifique su licencia cuando tenga conexión a internet.',
+            buttons: ['Continuar']
+          });
+        } 
+        // Si el servidor invalida el token y no estamos en modo especial
+        else if (!serverValidation.valid) {
+          console.log('Token invalidado por el servidor');
+          return { valid: false, requiresToken: true };
+        }
+      } catch (serverError) {
+        // Si hay error de conexión pero el token es válido localmente,
+        // permitimos continuar en modo offline
+        console.error('Error en validación con servidor:', serverError);
+        
+        await dialog.showMessageBox({
+          type: 'warning',
+          title: 'Modo Offline',
+          message: 'No se pudo validar la licencia con el servidor',
+          detail: 'La aplicación funcionará en modo offline. Se validará automáticamente cuando haya conexión a internet.',
+          buttons: ['Continuar']
+        });
       }
-    } catch (serverError) {
-      // Si hay error de conexión, mostramos el mensaje y cerramos la aplicación
-      console.error('Error en validación con servidor:', serverError);
-      
-      await dialog.showMessageBox({
-        type: 'error',
-        title: 'Error de Conexión',
-        message: 'No se pudo validar el token con el servidor',
-        detail: 'Verifique su conexión a internet e intente nuevamente.',
-        buttons: ['OK']
-      });
-      
-      // Cerramos la aplicación
-      app.quit();
-      // Retornamos null para indicar que no debe continuar el proceso
-      return null;
     }
 
-    // Solo llegamos aquí si ambas validaciones fueron exitosas
+    // Solo llegamos aquí si ambas validaciones fueron exitosas o estamos en modo offline
     // 3. Verificar credenciales
     const credentials = configHandler.getCredentials();
     console.log('Verificando credenciales...');
@@ -133,6 +166,22 @@ async function verificarLicenciaInicial() {
 
   } catch (error) {
     console.error('Error en verificación inicial:', error);
+    
+    // Intento de permitir acceso en caso de error como último recurso
+    const storedToken = licenseHandler.getStoredToken();
+    const credentials = configHandler.getCredentials();
+    
+    if (storedToken && storedToken.token && credentials) {
+      await dialog.showMessageBox({
+        type: 'warning',
+        title: 'Modo de Emergencia',
+        message: 'Error en la verificación de licencia',
+        detail: 'Se permitirá el acceso en modo de emergencia. Por favor contacte a soporte si este mensaje persiste.',
+        buttons: ['Continuar']
+      });
+      
+      return { valid: true, emergencyMode: true };
+    }
     
     await dialog.showMessageBox({
       type: 'error',
@@ -335,9 +384,9 @@ ipcMain.handle('token:verify', async (event, token) => {
       };
     }
 
-    // Llamar al método del licenseHandler
+    // Llamar al método del licenseHandler que ahora incluye la funcionalidad de redención
     const result = await licenseHandler.validateToken(token);
-    console.log(`Resultado de validación: ${JSON.stringify(result)}`);
+    console.log(`Resultado de validación/redención: ${JSON.stringify(result)}`);
 
     // Si el token es válido, redirigir a la siguiente pantalla
     if (result.valid) {

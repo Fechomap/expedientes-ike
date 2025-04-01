@@ -63,3 +63,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     });
   }
 });
+// No es necesario modificar este archivo ya que los métodos necesarios ya están expuestos:
+// verifyToken ya maneja tanto la validación como la redención de tokens
+
+// Solo asegurémonos de que la documentación esté actualizada:
+/**
+ * verifyToken: Ahora maneja tanto la validación como la redención de tokens.
+ * Primero intenta redimir el token a través de una solicitud POST.
+ * Si la redención falla, intenta validar el token con el método estándar.
+ * @param {string} token - El token a verificar y potencialmente redimir
+ * @returns {Promise<Object>} - Resultado de la operación con información sobre la validez
+ */

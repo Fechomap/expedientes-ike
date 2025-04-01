@@ -1,4 +1,5 @@
-// ui/assets/js/license-ui.js
+// ui/assets/js/license-ui.js (actualización)
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Inicializando interfaz de licencia...');
     const tokenInput = document.getElementById('tokenInput');
@@ -65,6 +66,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p><strong>Vence:</strong> ${expirationDate}</p>
                     ${status.daysUntilExpiration !== undefined ? 
                       `<p><strong>Días restantes:</strong> ${status.daysUntilExpiration}</p>` : ''}
+                    ${status.redeemed ? 
+                      `<p><strong>¡Token redimido exitosamente!</strong></p>` : ''}
                     ${status.warning ? 
                       `<p style="color: #856404;"><strong>Advertencia:</strong> Su licencia expirará pronto.</p>` : ''}
                     ${status.offlineMode ? 
@@ -140,15 +143,19 @@ document.addEventListener('DOMContentLoaded', () => {
             showLoader();
 
             try {
+                // Mostrar mensaje de intento de redención
+                tokenSuccess.textContent = 'Intentando redimir token...';
+                
                 const result = await window.electronAPI.verifyToken(token);
-                console.log('Resultado de validación:', result);
+                console.log('Resultado de validación/redención:', result);
 
                 if (result.valid) {
-                    tokenSuccess.textContent = 'Token validado correctamente';
+                    // Mensaje específico si el token fue redimido
+                    tokenSuccess.textContent = result.redeemed ? 
+                        'Token redimido exitosamente. Redirigiendo...' : 
+                        'Token validado correctamente. Redirigiendo...';
+                        
                     updateLicenseStatus(result);
-                    
-                    // Mensaje adicional para informar al usuario
-                    tokenSuccess.textContent += '. Redirigiendo...';
                     
                     // Redirección después de un breve delay
                     setTimeout(() => {

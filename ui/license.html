@@ -48,6 +48,23 @@
       margin-left: 10px;
     }
 
+    .info-text {
+      font-size: 13px;
+      color: #6c757d;
+      margin-top: 10px;
+      font-style: italic;
+    }
+
+    .token-info {
+      background-color: #e2f0fd;
+      color: #0c5460;
+      padding: 12px;
+      border-radius: 5px;
+      margin-top: 15px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
@@ -61,14 +78,19 @@
     <!-- Sección de Token -->
     <div class="token-section">
       <h2>Validación de Token</h2>
+      <div class="token-info">
+        <strong>Información importante:</strong> Al ingresar su token, este será validado y redimido automáticamente.
+        Un token redimido activa su licencia permanentemente en este dispositivo.
+      </div>
       <div id="tokenStatus">
         <div class="input-group">
           <label for="tokenInput">Ingrese su token de acceso:</label>
           <input type="text" id="tokenInput" placeholder="Ingrese el token aquí">
           <div id="tokenError" class="error-message"></div>
           <div id="tokenSuccess" class="success-message"></div>
+          <div class="info-text">El token será validado y redimido al presionar el botón.</div>
         </div>
-        <button id="validateToken">Validar Token</button>
+        <button id="validateToken">Validar y Redimir Token</button>
         <span id="validationLoader" class="loading" style="display: none;"></span>
       </div>
     </div>

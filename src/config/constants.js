@@ -7,7 +7,8 @@ const API_CONFIG = {
   BASE_URL: 'https://ike-license-manager-9b796c40a448.herokuapp.com',
   ENDPOINTS: {
     VALIDATE_TOKEN: '/api/validate',
-    CHECK_VALIDITY: '/api/check-validity'
+    CHECK_VALIDITY: '/api/check-validity',
+    REDEEM_TOKEN: '/api/redeem' // Nuevo endpoint para redimir tokens
   },
   HEADERS: {
     'Content-Type': 'application/json',
@@ -38,7 +39,9 @@ const ERROR_MESSAGES = {
   VALIDATION_ERROR: 'Error durante la validación del token. Inténtelo nuevamente.',
   TOKEN_IN_USE: 'Este token ya está en uso en otro dispositivo.',
   EMPTY_TOKEN: 'El token no puede estar vacío.',
-  CONNECTION_TIMEOUT: 'Tiempo de espera agotado. Verifique su conexión e intente nuevamente.'
+  CONNECTION_TIMEOUT: 'Tiempo de espera agotado. Verifique su conexión e intente nuevamente.',
+  REDEMPTION_ERROR: 'Error al redimir el token. Por favor, inténtelo nuevamente.',
+  ALREADY_REDEEMED: 'Este token ya ha sido redimido. Por favor, utilice un token nuevo.'
 };
 
 /**
