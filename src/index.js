@@ -1,7 +1,6 @@
 // src/index.js
 const path = require('path');
 const fs = require('fs');
-const Papa = require('papaparse');
 
 const { readExpedientesAndRows } = require('./utils/readExcel');
 const BrowserHandler = require('./utils/browserHandler');
@@ -25,7 +24,6 @@ async function processExcelFile(filePath, progressCallback) {
     }
 
     const resultados = [];
-    const reportePath = path.join(path.dirname(filePath), 'reporteValidacion.csv');
     const batchSize = 5;
 
     for (let i = 0; i < filas.length; i++) {
@@ -103,9 +101,7 @@ async function processExcelFile(filePath, progressCallback) {
     await browserHandler.close();
 
     // Generar reporte CSV
-    const csvFinal = Papa.unparse(resultados, { header: true });
-    fs.writeFileSync(reportePath, csvFinal, 'utf8');
-    console.log(`Reporte CSV generado en: ${reportePath}`);
+    console.log('Reporte CSV omitido por configuración actual.');
 
     progressCallback({ 
       message: `Proceso finalizado. Se revisaron ${filas.length} expedientes.`,

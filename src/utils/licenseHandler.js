@@ -1,7 +1,6 @@
 // src/utils/licenseHandler.js
 const { MongoClient } = require('mongodb');
-const crypto = require('crypto');
-const moment = require('moment');
+const dayjs = require('dayjs');
 const Store = require('electron-store');
 const { app, dialog } = require('electron');
 const os = require('os');
@@ -247,25 +246,7 @@ class LicenseHandler {
 
   // Método para generar un machineId basado en información del sistema
   generateMachineId() {
-    try {
-      const platform = process.platform;
-      const hostname = os.hostname();
-      const username = process.env.USERNAME || process.env.USER;
-      const cpuInfo = JSON.stringify(os.cpus()[0]);
-      
-      // Usar más información para crear un ID más único
-      return crypto
-        .createHash('sha256')
-        .update(`${platform}-${hostname}-${username}-${cpuInfo}`)
-        .digest('hex');
-    } catch (error) {
-      this.log.error('Error al generar machineId:', error);
-      // Fallback en caso de error
-      return crypto
-        .createHash('sha256')
-        .update(`fallback-${Date.now()}-${Math.random()}`)
-        .digest('hex');
-    }
+    return `machine-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
   }
 
   // Método mejorado para realizar solicitudes a la API con reintentos
@@ -399,8 +380,7 @@ class LicenseHandler {
     }
 
     // Verificar si el token ha expirado localmente
-    const now = moment();
-    const expirationDate = moment(storedToken.expiresAt);
+    const dayjs = require('dayjs');    const expirationDate = dayjs(storedToken.expiresAt);
     const daysUntilExpiration = expirationDate.diff(now, 'days');
 
     this.log.info(`Días hasta expiración: ${daysUntilExpiration}`);
@@ -501,8 +481,7 @@ class LicenseHandler {
         this.log.error('Error al verificar con servidor:', serverError.message);
         
         // En modo offline, verificamos la fecha local como respaldo
-        const now = moment();
-        const expirationDate = moment(storedToken.expiresAt);
+        const dayjs = require('dayjs');        const expirationDate = dayjs(storedToken.expiresAt);
         
         // Si el token ya está expirado localmente y no podemos verificar,
         // lo consideramos válido temporalmente para permitir el uso offline
@@ -674,8 +653,7 @@ class LicenseHandler {
         return { valid: false, message: 'Licencia inactiva en el servidor' };
       }
 
-      const now = moment();
-      const expirationDate = moment(license.expiresAt);
+      const dayjs = require('dayjs');      const expirationDate = dayjs(license.expiresAt);
       const daysUntilExpiration = expirationDate.diff(now, 'days');
 
       if (daysUntilExpiration < 0) {
@@ -891,7 +869,7 @@ class LicenseHandler {
     const trialInfo = {
       type: 'trial',
       startDate: new Date(),
-      expiresAt: moment().add(this.TRIAL_PERIOD_DAYS, 'days').toDate(),
+      expiresAt: dayjs().add(this.TRIAL_PERIOD_DAYS, 'days').toDate(),
       machineId: this.generateMachineId()
     };
     this.store.set('trial', trialInfo);
@@ -902,8 +880,7 @@ class LicenseHandler {
     const trial = this.store.get('trial');
     if (!trial) return { valid: false };
 
-    const now = moment();
-    const expirationDate = moment(trial.expiresAt);
+    const dayjs = require('dayjs');    const expirationDate = dayjs(trial.expiresAt);
     const daysRemaining = expirationDate.diff(now, 'days');
 
     return {
