@@ -8,43 +8,22 @@ const os = require('os');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const log = require('electron-log');
 
-// Definición de constantes
-const TOKEN_STATUS = {
-  VALID: 'valid',
-  EXPIRED: 'expired',
-  INVALID: 'invalid',
-  PENDING: 'pending',
-  RENEWABLE: 'renewable'  // Nuevo estado
-};
-
-// Actualizar el mensaje para tokens expirados
-const ERROR_MESSAGES = {
-  INVALID_TOKEN: 'Token inválido. Por favor, ingresa un token válido.',
-  EXPIRED_TOKEN: 'Su licencia ha expirado. Por favor, renuévela en la aplicación IKE Licencias.',
-  RENEWABLE_TOKEN: 'Su licencia ha expirado pero puede renovarla en la aplicación IKE Licencias.',
-  NETWORK_ERROR: 'Error de conexión. Por favor, verifica tu conexión a internet.',
-  SERVER_ERROR: 'Error en el servidor. Por favor, intenta más tarde.'
-};
-
-const API_CONFIG = {
-  BASE_URL: 'https://ike-license-manager-9b796c40a448.herokuapp.com',
-  ENDPOINTS: {
-    VALIDATE_TOKEN: '/api/validate',
-    CHECK_VALIDITY: '/api/check-validity'
-  },
-  HEADERS: {
-    'Content-Type': 'application/json'
-  }
-};
+// Importar constantes desde config
+const { API_CONFIG, TOKEN_STATUS, ERROR_MESSAGES } = require('../config/constants');
 
 class LicenseHandler {
   constructor() {
+    // Configurar logging
+    this.log = log.scope('license');
+    this.log.info('Inicializando LicenseHandler');
+    
     // Obtener y mostrar la ruta donde Electron guarda los datos de usuario
     const storePath = app.getPath('userData');
-    console.log('Store path:', storePath);
+    this.log.info('Store path:', storePath);
 
-    // Construir la ruta completa del archivo que utiliza electron-store para este store (por defecto, el archivo se llamará license.json)
+    // Construir la ruta completa del archivo que utiliza electron-store
     const filePath = path.join(storePath, 'license.json');
     
     // Verificar si el archivo existe y si su contenido es un JSON válido
@@ -53,23 +32,30 @@ class LicenseHandler {
         const fileContent = fs.readFileSync(filePath, 'utf8');
         JSON.parse(fileContent);
       } catch (error) {
-        console.error('Archivo de configuración corrupto. Se eliminará para evitar conflictos.', error);
+        this.log.error('Archivo de configuración corrupto. Se eliminará para evitar conflictos.', error);
         fs.unlinkSync(filePath); // Elimina el archivo corrupto
       }
     }
 
     // Crear la instancia de electron-store
     this.store = new Store({
-      name: 'license'
+      name: 'license',
+      // Agregar encriptación opcional para mayor seguridad
+      encryptionKey: 'ike-secure-key-2024'
     });
     
     this.client = null;
     this.checkInterval = null;
     this.EXPIRATION_WARNING_DAYS = 3;
     this.TRIAL_PERIOD_DAYS = 30;
+    
+    // Límites para las solicitudes a la API
+    this.API_TIMEOUT = 15000; // 15 segundos
+    this.API_RETRY_LIMIT = 3;
+    this.API_RETRY_DELAY = 2000; // 2 segundos
   }
 
-  // Método para obtener información del dispositivo
+  // Método para obtener información del dispositivo con más detalles
   getDeviceInfo() {
     try {
       const info = {
@@ -79,7 +65,12 @@ class LicenseHandler {
         cpus: os.cpus().length,
         totalMemory: os.totalmem(),
         osType: os.type(),
-        osRelease: os.release()
+        osRelease: os.release(),
+        appVersion: app.getVersion(),
+        electronVersion: process.versions.electron,
+        nodeVersion: process.versions.node,
+        userDataPath: app.getPath('userData'),
+        date: new Date().toISOString()
       };
 
       return {
@@ -88,7 +79,7 @@ class LicenseHandler {
         cpus: `${info.cpus} cores`
       };
     } catch (error) {
-      console.error('Error getting device info:', error);
+      this.log.error('Error getting device info:', error);
       return {
         platform: 'unknown',
         hostname: 'unknown',
@@ -96,7 +87,9 @@ class LicenseHandler {
         cpus: 'unknown',
         totalMemory: 'unknown',
         osType: 'unknown',
-        osRelease: 'unknown'
+        osRelease: 'unknown',
+        appVersion: app.getVersion(),
+        error: error.message
       };
     }
   }
@@ -104,14 +97,18 @@ class LicenseHandler {
   // Método para guardar el token validado
   async saveValidatedToken(tokenData) {
     try {
-      this.store.set('validatedToken', {
+      // Agregar más metadatos
+      const enrichedTokenData = {
         ...tokenData,
-        validatedAt: new Date().toISOString()
-      });
-      console.log('Token guardado exitosamente:', tokenData.token);
+        validatedAt: new Date().toISOString(),
+        appVersion: app.getVersion()
+      };
+      
+      this.store.set('validatedToken', enrichedTokenData);
+      this.log.info('Token guardado exitosamente:', tokenData.token);
       return true;
     } catch (error) {
-      console.error('Error al guardar el token:', error);
+      this.log.error('Error al guardar el token:', error);
       return false;
     }
   }
@@ -120,57 +117,124 @@ class LicenseHandler {
   getStoredToken() {
     try {
       const tokenData = this.store.get('validatedToken');
-      console.log('Token almacenado encontrado:', tokenData);
-      return tokenData;
+      if (tokenData) {
+        this.log.info('Token almacenado encontrado, expira:', tokenData.expiresAt);
+        return tokenData;
+      }
+      this.log.info('No se encontró token almacenado');
+      return null;
     } catch (error) {
-      console.error('Error al obtener el token guardado:', error);
+      this.log.error('Error al obtener el token guardado:', error);
       return null;
     }
   }
 
   // Método para generar un machineId basado en información del sistema
   generateMachineId() {
-    const platform = process.platform;
-    const hostname = os.hostname();
-    const username = process.env.USERNAME || process.env.USER;
-    return crypto
-      .createHash('sha256')
-      .update(`${platform}-${hostname}-${username}`)
-      .digest('hex');
+    try {
+      const platform = process.platform;
+      const hostname = os.hostname();
+      const username = process.env.USERNAME || process.env.USER;
+      const cpuInfo = JSON.stringify(os.cpus()[0]);
+      
+      // Usar más información para crear un ID más único
+      return crypto
+        .createHash('sha256')
+        .update(`${platform}-${hostname}-${username}-${cpuInfo}`)
+        .digest('hex');
+    } catch (error) {
+      this.log.error('Error al generar machineId:', error);
+      // Fallback en caso de error
+      return crypto
+        .createHash('sha256')
+        .update(`fallback-${Date.now()}-${Math.random()}`)
+        .digest('hex');
+    }
   }
 
-  // Método modificado para validar token con la nueva API
+  // Método mejorado para realizar solicitudes a la API con reintentos
+  async apiRequest(url, method, data = null, retryCount = 0) {
+    try {
+      const config = {
+        method,
+        url,
+        headers: API_CONFIG.HEADERS,
+        timeout: this.API_TIMEOUT
+      };
+      
+      if (data && (method === 'post' || method === 'put')) {
+        config.data = data;
+      }
+      
+      this.log.info(`Enviando solicitud ${method.toUpperCase()} a: ${url}`);
+      const response = await axios(config);
+      return response.data;
+    } catch (error) {
+      // Registrar detalles del error
+      this.log.error(`Error en solicitud ${method.toUpperCase()} a ${url}:`, error.message);
+      
+      if (error.response) {
+        this.log.error('Respuesta del servidor:', error.response.status, error.response.data);
+        return { 
+          success: false, 
+          status: error.response.status,
+          message: error.response.data?.message || ERROR_MESSAGES.SERVER_ERROR 
+        };
+      }
+      
+      // Reintentar en caso de errores de red si no se excede el límite
+      if (retryCount < this.API_RETRY_LIMIT && 
+          (error.code === 'ECONNABORTED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT')) {
+        this.log.info(`Reintentando solicitud (${retryCount + 1}/${this.API_RETRY_LIMIT})...`);
+        await new Promise(resolve => setTimeout(resolve, this.API_RETRY_DELAY));
+        return this.apiRequest(url, method, data, retryCount + 1);
+      }
+      
+      // Si aún falla después de los reintentos o es otro tipo de error
+      return {
+        success: false,
+        error: error.message,
+        message: ERROR_MESSAGES.NETWORK_ERROR
+      };
+    }
+  }
+
   // Método mejorado para validar token con la API
   async validateToken(token) {
+    if (!token || token.trim() === '') {
+      return {
+        valid: false,
+        status: TOKEN_STATUS.INVALID,
+        message: 'El token no puede estar vacío'
+      };
+    }
+    
     try {
       const deviceInfo = this.getDeviceInfo();
       const machineId = this.generateMachineId();
       const deviceInfoString = JSON.stringify(deviceInfo);
 
-      console.log('Validando token:', token);
+      this.log.info('Validando token:', token);
       
-      // Añadir tiempo límite para evitar bloqueos
-      const response = await axios.post(
+      // Usar el método apiRequest con reintentos
+      const response = await this.apiRequest(
         `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.VALIDATE_TOKEN}`,
+        'post',
         {
           token,
           machineId,
           deviceInfo: deviceInfoString
-        },
-        {
-          headers: API_CONFIG.HEADERS,
-          timeout: 10000 // 10 segundos de timeout
         }
       );
 
-      console.log('Respuesta del servidor:', response.data);
+      this.log.info('Respuesta de validación de token:', JSON.stringify(response));
 
-      if (response.status === 200 && response.data.success) {
+      if (response.success) {
         const tokenData = {
           token,
           machineId,
           deviceInfo: deviceInfoString,
-          expiresAt: response.data.expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          expiresAt: response.expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           createdAt: new Date().toISOString(),
           lastValidation: new Date().toISOString()
         };
@@ -186,74 +250,82 @@ class LicenseHandler {
         };
       }
 
+      // Si la respuesta no es exitosa
       return {
         valid: false,
-        status: TOKEN_STATUS.INVALID,
-        message: response.data.message || ERROR_MESSAGES.INVALID_TOKEN
+        status: response.status === 403 ? TOKEN_STATUS.EXPIRED : TOKEN_STATUS.INVALID,
+        message: response.message || ERROR_MESSAGES.INVALID_TOKEN
       };
 
     } catch (error) {
-      console.error('Error validating token:', error);
-
-      if (error.response) {
-        const status = error.response.status;
-        const message = error.response.data?.message || ERROR_MESSAGES.SERVER_ERROR;
-
-        // Manejo específico según código de estado
-        return {
-          valid: false,
-          status: status === 403 ? TOKEN_STATUS.EXPIRED : TOKEN_STATUS.INVALID,
-          message
-        };
-      }
-
-      // Error de conexión
+      this.log.error('Error inesperado al validar token:', error);
+      
       return {
         valid: false,
         status: TOKEN_STATUS.INVALID,
-        message: ERROR_MESSAGES.NETWORK_ERROR
+        message: ERROR_MESSAGES.VALIDATION_ERROR
       };
     }
   }
 
-  // Método modificado para verificar el estado del token almacenado
+  // Método mejorado para verificar el estado del token almacenado
   async checkTokenStatus() {
     const storedToken = this.getStoredToken();
 
     if (!storedToken) {
-      console.log('No hay token almacenado');
+      this.log.info('No hay token almacenado');
       return {
         valid: false,
         status: TOKEN_STATUS.INVALID,
-        message: 'No hay token almacenado'
+        message: 'No hay token almacenado',
+        requiresToken: true
       };
     }
 
     // Verificar si el token ha expirado localmente
     const now = moment();
     const expirationDate = moment(storedToken.expiresAt);
+    const daysUntilExpiration = expirationDate.diff(now, 'days');
+
+    this.log.info(`Días hasta expiración: ${daysUntilExpiration}`);
 
     if (now.isAfter(expirationDate)) {
-      console.log('Token expirado pero se conserva para posible renovación');
+      this.log.info('Token expirado, se marca como renovable');
       return {
         valid: false,
-        status: TOKEN_STATUS.RENEWABLE,  // Nuevo estado
+        status: TOKEN_STATUS.RENEWABLE,
         message: ERROR_MESSAGES.RENEWABLE_TOKEN,
-        token: storedToken.token,  // Importante: preservar el token
-        expiresAt: storedToken.expiresAt
+        token: storedToken.token,
+        expiresAt: storedToken.expiresAt,
+        expired: true,
+        renewable: true
       };
     }
 
-    // Si el token no ha expirado, lo consideramos válido sin hacer llamada al servidor
+    // Si el token no ha expirado, verificar si está cerca de expirar
+    if (daysUntilExpiration <= this.EXPIRATION_WARNING_DAYS) {
+      this.log.info('Token próximo a expirar');
+      return {
+        valid: true,
+        status: TOKEN_STATUS.VALID,
+        expiresAt: storedToken.expiresAt,
+        message: `Token válido, expira en ${daysUntilExpiration} días`,
+        warning: true,
+        daysUntilExpiration
+      };
+    }
+
+    // Token válido y no cerca de expirar
     return {
       valid: true,
       status: TOKEN_STATUS.VALID,
       expiresAt: storedToken.expiresAt,
-      message: 'Token válido'
+      message: 'Token válido',
+      daysUntilExpiration
     };
   }
 
-  // Método modificado para la verificación de licencia inicial
+  // Método mejorado para la verificación de licencia inicial
   async checkInitialLicense() {
     try {
       const storedToken = this.getStoredToken();
@@ -279,23 +351,23 @@ class LicenseHandler {
         now.isAfter(expirationDate);
         
       if (needsVerification) {
-        console.log('Se requiere verificación con el servidor...');
+        this.log.info('Se requiere verificación con el servidor...');
         
         try {
           const serverStatus = await this.validateWithServer();
           
           // Si el servidor indica que el token es válido
           if (serverStatus.valid) {
-            console.log('El servidor indica que el token sigue válido');
+            this.log.info('El servidor indica que el token sigue válido');
             return {
               valid: true,
               token: storedToken.token,
-              expiresAt: storedToken.expiresAt  // Mantenemos la fecha original
+              expiresAt: storedToken.expiresAt
             };
           }
           
           // Si el servidor confirma que no es válido
-          console.log('El servidor confirma que el token no es válido');
+          this.log.info('El servidor confirma que el token no es válido');
           return {
             valid: false,
             message: ERROR_MESSAGES.EXPIRED_TOKEN,
@@ -303,15 +375,17 @@ class LicenseHandler {
           };
         } catch (serverError) {
           // Si no podemos conectar con el servidor
-          console.error('Error al verificar con servidor:', serverError.message);
+          this.log.error('Error al verificar con servidor:', serverError.message);
           
-          // CAMBIO: Si el token ya está expirado localmente y no podemos verificar,
+          // Si el token ya está expirado localmente y no podemos verificar,
           // entonces lo consideramos inválido
           if (now.isAfter(expirationDate)) {
             return {
               valid: false,
               message: ERROR_MESSAGES.RENEWABLE_TOKEN,
-              requiresToken: true
+              requiresToken: true,
+              expired: true,
+              renewable: true
             };
           }
           
@@ -327,13 +401,21 @@ class LicenseHandler {
       }
       
       // Si el token no está expirado localmente y no necesita verificación
+      const daysUntilExpiration = expirationDate.diff(now, 'days');
+      const warning = daysUntilExpiration <= this.EXPIRATION_WARNING_DAYS;
+      
       return {
         valid: true,
         token: storedToken.token,
-        expiresAt: storedToken.expiresAt
+        expiresAt: storedToken.expiresAt,
+        message: warning ? 
+          `Token válido, expira en ${daysUntilExpiration} días` : 
+          'Token válido',
+        warning,
+        daysUntilExpiration
       };
     } catch (error) {
-      console.error('Error en checkInitialLicense:', error);
+      this.log.error('Error en checkInitialLicense:', error);
       return {
         valid: false,
         message: error.message || 'Error al verificar la licencia',
@@ -342,36 +424,33 @@ class LicenseHandler {
     }
   }
   
+  // Método mejorado para validar con el servidor
   async validateWithServer() {
     try {
       const storedToken = this.getStoredToken();
       
       if (!storedToken || !storedToken.token) {
-        console.log('No hay token para validar con el servidor');
+        this.log.info('No hay token para validar con el servidor');
         return { valid: false, message: 'No hay token para validar' };
       }
     
-      console.log('Consultando si el token está activo...');
-      const validityResponse = await axios.get(
-        `${API_CONFIG.BASE_URL}/api/check-validity/${storedToken.token}`,
-        { 
-          timeout: 10000,
-          headers: {
-            'Accept': 'application/json'
-          }
-        }
+      this.log.info('Consultando si el token está activo...');
+      
+      // Usar el método apiRequest con reintentos
+      const validityResponse = await this.apiRequest(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.CHECK_VALIDITY}/${storedToken.token}`,
+        'get'
       );
       
-      console.log('Respuesta de validez:', validityResponse.data);
+      this.log.info('Respuesta de validez:', validityResponse);
       
-      // IMPORTANTE: La respuesta es directamente un valor booleano
-      const isActive = validityResponse.data === true;
+      // Analizar la respuesta
+      const isActive = validityResponse === true || validityResponse.success === true;
       
       if (isActive) {
-        console.log('El token está activo según el servidor');
+        this.log.info('El token está activo según el servidor');
         
-        // CAMBIO IMPORTANTE: NO modificamos la fecha de expiración local
-        // Solo registramos la fecha de la última validación exitosa
+        // Actualización del token
         const updatedToken = {
           ...storedToken,
           lastServerValidation: new Date().toISOString(),
@@ -379,26 +458,25 @@ class LicenseHandler {
         };
         
         await this.saveValidatedToken(updatedToken);
-        console.log('Token actualizado con verificación del servidor');
+        this.log.info('Token actualizado con verificación del servidor');
         
         return {
           valid: true,
           message: 'Token activo en servidor',
-          // Mantenemos la misma fecha de expiración que ya tenía el token
           expiresAt: storedToken.expiresAt
         };
       } else {
-        console.log('El token no está activo según el servidor');
+        this.log.info('El token no está activo según el servidor');
         return {
           valid: false,
-          message: 'El token no está activo en el servidor'
+          message: validityResponse.message || 'El token no está activo en el servidor'
         };
       }
     } catch (error) {
-      console.error('Error en validación con servidor:', error);
+      this.log.error('Error en validación con servidor:', error);
       
       if (error.response) {
-        console.error('Respuesta de error del servidor:', error.response.data);
+        this.log.error('Respuesta de error del servidor:', error.response.data);
         return { 
           valid: false, 
           message: `Error del servidor: ${error.response.status}` 
@@ -424,13 +502,13 @@ class LicenseHandler {
       if (!this.client) {
         this.client = new MongoClient(process.env.MONGODB_URI);
         await this.client.connect();
-        console.log('Conexión exitosa a MongoDB');
+        this.log.info('Conexión exitosa a MongoDB');
       }
 
       const db = this.client.db(process.env.MONGODB_DB);
       return db.collection(process.env.MONGODB_COLLECTION);
     } catch (error) {
-      console.error('Error en connect:', error);
+      this.log.error('Error en connect:', error);
       throw error;
     }
   }
@@ -446,11 +524,11 @@ class LicenseHandler {
     try {
       // Retraso artificial para simular el proceso de validación
       await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log('Validando licencia:', licenseKey);
+      this.log.info('Validando licencia:', licenseKey);
       const collection = await this.connect();
 
       const license = await collection.findOne({ key: licenseKey });
-      console.log('Licencia encontrada:', license);
+      this.log.info('Licencia encontrada:', license);
 
       if (!license) {
         return { valid: false, message: 'Licencia no encontrada' };
@@ -503,7 +581,7 @@ class LicenseHandler {
         message: 'Licencia válida'
       };
     } catch (error) {
-      console.error('Error en validateLicense:', error);
+      this.log.error('Error en validateLicense:', error);
       return { valid: false, message: 'Error al validar licencia' };
     } finally {
       await this.disconnect();
@@ -537,7 +615,6 @@ class LicenseHandler {
   }
 
   // Métodos para manejar diálogos y estados de licencia/token
-
   handleInvalidToken(message) {
     dialog.showMessageBox({
       type: 'error',

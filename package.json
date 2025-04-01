@@ -18,11 +18,12 @@
     "build:linux": "electron-builder --linux",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "release": "node scripts/version-bump.js && node scripts/publish-updates.js",
+    "release": "node scripts/version-bump.js && node scripts/publish-github.js",
     "publish": "electron-builder -p always",
     "publish:win": "electron-builder --win -p always",
     "publish:mac": "electron-builder --mac -p always",
-    "publish:linux": "electron-builder --linux -p always"
+    "publish:linux": "electron-builder --linux -p always",
+    "publish:github": "node scripts/publish-github.js"
   },
   "dependencies": {
     "asar": "^3.2.0",
@@ -63,11 +64,11 @@
     },
     "publish": [
       {
-        "provider": "s3",
-        "bucket": "ike-expedientes-updates",
-        "region": "us-east-1",
-        "path": "/",
-        "channel": "latest"
+        "provider": "github",
+        "owner": "Fechomap",
+        "repo": "expedientes-ike",
+        "private": false,
+        "releaseType": "draft"
       }
     ],
     "mac": {

@@ -5,14 +5,14 @@ asarUnpack: ["**/node_modules/puppeteer-core/**/*"]
 removePackageScripts: true
 compression: "normal"
 
-# Configuración para actualizaciones automáticas
+# Configuración para actualizaciones automáticas usando GitHub
 publish:
-  provider: s3
-  bucket: ike-expedientes-updates
-  region: us-east-1
-  path: "/"
-  # Eliminamos la opción acl porque el bucket no soporta ACLs
-  channel: latest
+  provider: github
+  owner: "Fechomap" # Reemplazar con el nombre de usuario/organización correcta
+  repo: "expedientes-ike"
+  private: false
+  releaseType: draft # Cambia a "release" en producción
+  # Opcional: versionPrefix: "v" 
 
 directories:
   output: "dist"
@@ -59,4 +59,4 @@ linux:
   synopsis: "IKE Expedientes Automation"
   description: "Aplicación para automatizar la gestión de expedientes"
 
-#afterPack: "./build/scripts/after-pack.js"
+afterPack: "./build/scripts/after-pack.js"

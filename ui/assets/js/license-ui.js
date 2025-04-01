@@ -7,63 +7,118 @@ document.addEventListener('DOMContentLoaded', () => {
     const tokenSuccess = document.getElementById('tokenSuccess');
     const validationLoader = document.getElementById('validationLoader');
     const licenseStatus = document.getElementById('licenseStatus');
+    const renewalActions = document.getElementById('renewalActions');
+    const renewButton = document.getElementById('renewLicense');
 
-    // Limpiar mensajes
+    /**
+     * Limpia los mensajes de error y éxito
+     */
     const clearMessages = () => {
         if (tokenError) tokenError.textContent = '';
         if (tokenSuccess) tokenSuccess.textContent = '';
     };
 
-    // Mostrar loader
+    /**
+     * Muestra el indicador de carga durante la validación
+     */
     const showLoader = () => {
         if (validationLoader) validationLoader.style.display = 'inline-block';
         if (validateButton) validateButton.disabled = true;
     };
 
-    // Ocultar loader
+    /**
+     * Oculta el indicador de carga
+     */
     const hideLoader = () => {
         if (validationLoader) validationLoader.style.display = 'none';
         if (validateButton) validateButton.disabled = false;
     };
 
-    // Actualizar estado de licencia
+    /**
+     * Formatea una fecha para mostrarla
+     * @param {string} dateString - Fecha en formato ISO
+     * @returns {string} - Fecha formateada
+     */
+    const formatDate = (dateString) => {
+        try {
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        } catch (e) {
+            return dateString || 'Desconocida';
+        }
+    };
+
+    /**
+     * Actualiza la UI con el estado de la licencia
+     * @param {Object} status - Información del estado de la licencia
+     */
     const updateLicenseStatus = (status) => {
-        if (licenseStatus) {
-            if (status.valid) {
-                const expirationDate = new Date(status.expiresAt);
-                const formattedDate = expirationDate.toLocaleDateString();
-                licenseStatus.innerHTML = `
-                    <div style="background-color: #d4edda; color: #155724; padding: 10px; border-radius: 4px;">
-                        <p><strong>Estado:</strong> Activa</p>
-                        <p><strong>Vence:</strong> ${formattedDate}</p>
-                    </div>
-                `;
-            } else {
-                licenseStatus.innerHTML = `
-                    <div style="background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px;">
-                        <p><strong>Estado:</strong> Inactiva</p>
-                        <p><strong>Mensaje:</strong> ${status.message}</p>
-                    </div>
-                `;
+        if (!licenseStatus) return;
+
+        if (status.valid) {
+            const expirationDate = formatDate(status.expiresAt);
+            const warningClass = status.warning ? ' style="background-color: #fff3cd; color: #856404;"' : '';
+            
+            licenseStatus.innerHTML = `
+                <div style="background-color: #d4edda; color: #155724; padding: 15px; border-radius: 5px;${warningClass}">
+                    <p><strong>Estado:</strong> Activa</p>
+                    <p><strong>Vence:</strong> ${expirationDate}</p>
+                    ${status.daysUntilExpiration !== undefined ? 
+                      `<p><strong>Días restantes:</strong> ${status.daysUntilExpiration}</p>` : ''}
+                    ${status.warning ? 
+                      `<p style="color: #856404;"><strong>Advertencia:</strong> Su licencia expirará pronto.</p>` : ''}
+                    ${status.offlineMode ? 
+                      `<p><strong>Nota:</strong> Funcionando en modo sin conexión.</p>` : ''}
+                </div>
+            `;
+
+            // Mostrar opciones de renovación si está cerca de expirar
+            if (status.warning && renewalActions) {
+                renewalActions.style.display = 'block';
+            } else if (renewalActions) {
+                renewalActions.style.display = 'none';
+            }
+        } else {
+            licenseStatus.innerHTML = `
+                <div style="background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px;">
+                    <p><strong>Estado:</strong> ${status.expired ? 'Expirada' : 'Inactiva'}</p>
+                    <p><strong>Mensaje:</strong> ${status.message}</p>
+                    ${status.expiresAt ? 
+                      `<p><strong>Expiró:</strong> ${formatDate(status.expiresAt)}</p>` : ''}
+                    ${status.renewable ? 
+                      `<p style="color: #0c5460;"><strong>Información:</strong> Su licencia puede ser renovada.</p>` : ''}
+                </div>
+            `;
+
+            // Mostrar opciones de renovación si es renovable
+            if (status.renewable && renewalActions) {
+                renewalActions.style.display = 'block';
+            } else if (renewalActions) {
+                renewalActions.style.display = 'none';
             }
         }
     };
 
-    // Inicialización: verificar si ya hay un token válido
+    /**
+     * Verifica si ya existe un token almacenado
+     */
     const checkExistingToken = async () => {
         try {
             if (licenseStatus) {
-                licenseStatus.innerHTML = '<p>Verificando estado de licencia...</p>';
+                licenseStatus.innerHTML = '<p style="padding: 10px; text-align: center;"><em>Verificando estado de licencia...</em></p>';
             }
             
-            // Aquí podríamos hacer una llamada para verificar el token existente
-            // Por ahora, simplemente mostramos el estado de verificación
-            
-            licenseStatus.innerHTML = '<p>Ingrese un token para activar la licencia</p>';
+            // Podríamos agregar una llamada para verificar el token existente
+            // Por ahora simplemente mostramos instrucciones
+            setTimeout(() => {
+                if (licenseStatus) {
+                    licenseStatus.innerHTML = '<p style="padding: 10px;">Ingrese un token para activar la licencia</p>';
+                }
+            }, 1000);
         } catch (error) {
             console.error('Error al verificar token existente:', error);
             if (licenseStatus) {
-                licenseStatus.innerHTML = '<p>Error al verificar estado de licencia</p>';
+                licenseStatus.innerHTML = '<p style="color: #721c24; padding: 10px;">Error al verificar estado de licencia</p>';
             }
         }
     };
@@ -92,6 +147,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     tokenSuccess.textContent = 'Token validado correctamente';
                     updateLicenseStatus(result);
                     
+                    // Mensaje adicional para informar al usuario
+                    tokenSuccess.textContent += '. Redirigiendo...';
+                    
                     // Redirección después de un breve delay
                     setTimeout(() => {
                         window.electronAPI.reloadApp();
@@ -106,6 +164,14 @@ document.addEventListener('DOMContentLoaded', () => {
             } finally {
                 hideLoader();
             }
+        });
+    }
+
+    // Manejo para el botón de renovación
+    if (renewButton) {
+        renewButton.addEventListener('click', () => {
+            // Aquí se podría abrir un enlace externo para renovar
+            alert('Contacte a soporte@ike.com.mx para renovar su licencia.');
         });
     }
 
