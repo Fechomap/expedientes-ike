@@ -1,6 +1,6 @@
 {
   "name": "ike-expedientes-automation",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Automatización de procesamiento de expedientes IKE",
   "main": "src/main.js",
   "author": {
@@ -23,7 +23,8 @@
     "publish:win": "electron-builder --win -p always",
     "publish:mac": "electron-builder --mac -p always",
     "publish:linux": "electron-builder --linux -p always",
-    "publish:github": "node scripts/publish-github.js"
+    "publish:github": "node scripts/publish-github.js",
+    "full-build:win": "node scripts/full-windows-build.js"
   },
   "dependencies": {
     "asar": "^3.2.0",
@@ -49,6 +50,9 @@
     "appId": "com.ike.expedientes",
     "productName": "IKE Expedientes Automation",
     "asar": true,
+    "asarUnpack": [
+      "node_modules/puppeteer-core/**/*"
+    ],
     "files": [
       "src/**/*",
       "ui/**/*",
@@ -86,19 +90,31 @@
         }
       ],
       "icon": "build/icon.ico",
-      "requestedExecutionLevel": "requireAdministrator"
+      "requestedExecutionLevel": "asInvoker",
+      "extraResources": [
+        {
+          "from": "build/win-extras",
+          "to": "extraResources",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
-      "perMachine": true,
-      "allowToChangeInstallationDirectory": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "IKE Expedientes Automation",
       "uninstallDisplayName": "IKE Expedientes Automation",
-      "artifactName": "IKE-Expedientes-Automation-Setup-${version}.${ext}"
-    },
+      "artifactName": "IKE-Expedientes-Automation-Setup-${version}.${ext}",
+      "include": "build/installer.nsh",
+      "warningsAsErrors": false,
+      "allowElevation": true,
+      "runAfterFinish": true    },
     "afterPack": "./build/scripts/after-pack.js"
   }
 }

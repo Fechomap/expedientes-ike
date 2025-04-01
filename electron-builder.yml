@@ -1,62 +1,73 @@
-appId: "com.ikeautomation.app"
+# electron-builder.yml
+# Este es un archivo alternativo de configuración para electron-builder
+# Usa esta configuración para una compilación completa
+
+appId: "com.ike.expedientes"
 productName: "IKE Expedientes Automation"
+copyright: "Copyright © 2024 IKE Automation Team"
+
+# Compresión completa para mejor estabilidad
+compression: "maximum"
 asar: true
-asarUnpack: ["**/node_modules/puppeteer-core/**/*"]
-removePackageScripts: true
-compression: "normal"
+asarUnpack:
+  - "node_modules/puppeteer-core/**/*"
 
-# Configuración para actualizaciones automáticas usando GitHub
-publish:
-  provider: github
-  owner: "Fechomap" # Reemplazar con el nombre de usuario/organización correcta
-  repo: "expedientes-ike"
-  private: false
-  releaseType: draft # Cambia a "release" en producción
-  # Opcional: versionPrefix: "v" 
+# Archivos a incluir en la compilación
+files:
+  - "src/**/*"
+  - "ui/**/*"
+  - "build/**/*"
+  - "package.json"
 
+# Directorios de salida
 directories:
   output: "dist"
   buildResources: "build"
 
-files:
-  - "!{src,scripts,test,tools,docs}/**/*"
-  - "!**/*.{md,txt,ts,map}"
-  - "!**/package-lock.json"
-  - "!**/README.md"
-  - "!**/LICENSE"
+# Opciones de publicación
+publish:
+  - provider: "github"
+    owner: "Fechomap"
+    repo: "expedientes-ike"
+    private: false
+    releaseType: "draft"
 
+# Configuración para macOS
+mac:
+  category: "public.app-category.business"
+  target: 
+    - "dmg"
+  icon: "build/icon.icns"
+  hardenedRuntime: true
+
+# Configuración para Windows con opciones adicionales
 win:
-  target: "nsis"
+  # Generar tanto instalador como versión portable
+  target:
+    - "nsis"
+    - "portable"
   icon: "build/icon.ico"
-  requestedExecutionLevel: "requireAdministrator"
-  signAndEditExecutable: true
-  artifactName: "${productName}-Setup-${version}.${ext}"
+  requestedExecutionLevel: "asInvoker"
 
+# Configuración del instalador NSIS
 nsis:
   oneClick: false
-  perMachine: true
-  allowToChangeInstallationDirectory: false
-  deleteAppDataOnUninstall: true
+  perMachine: false
+  allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: "${productName}"
-  uninstallDisplayName: "${productName}"
-  differentialPackage: false
+  shortcutName: "IKE Expedientes Automation"
+  uninstallDisplayName: "IKE Expedientes Automation"
+  artifactName: "IKE-Expedientes-Automation-Setup-${version}.${ext}"
+  include: "build/installer.nsh"
+  warningsAsErrors: false
+  allowElevation: true
+  runAfterFinish: true
+  menuCategory: "IKE Software"
 
-mac:
-  target: "dmg"
-  icon: "build/icon.icns"
-  category: "public.app-category.business"
-  hardenedRuntime: true
-  gatekeeperAssess: false
-  entitlements: "build/entitlements.mac.plist"
-  entitlementsInherit: "build/entitlements.mac.plist"
-
-linux:
-  target: "AppImage"
-  icon: "build/icon.png"
-  category: "Office"
-  synopsis: "IKE Expedientes Automation"
-  description: "Aplicación para automatizar la gestión de expedientes"
-
+# Configuración para portable (EXE independiente)
+portable:
+  artifactName: "IKE-Expedientes-Automation-Portable-${version}.${ext}"
+  
+# Hooks para la compilación
 afterPack: "./build/scripts/after-pack.js"
