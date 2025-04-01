@@ -327,23 +327,38 @@ app.whenReady().then(async () => {
 ipcMain.handle('token:verify', async (event, token) => {
   try {
     console.log(`Verificando token recibido: ${token}`);
+    // Añadir validación básica
+    if (!token || token.trim() === '') {
+      return { 
+        valid: false, 
+        message: 'El token no puede estar vacío' 
+      };
+    }
+
+    // Llamar al método del licenseHandler
     const result = await licenseHandler.validateToken(token);
     console.log(`Resultado de validación: ${JSON.stringify(result)}`);
 
+    // Si el token es válido, redirigir a la siguiente pantalla
     if (result.valid) {
+      // Verificar si hay credenciales configuradas
       const creds = configHandler.getCredentials();
       let nextScreen;
 
       if (!creds) {
+        // Si no hay credenciales, ir a la pantalla de configuración
         nextScreen = path.join(__dirname, '..', 'ui', 'config.html');
       } else {
+        // Si hay credenciales, ir a la pantalla principal
         nextScreen = path.join(__dirname, '..', 'ui', 'index.html');
       }
 
+      // Mostrar pantalla de carga durante la transición
       const loadingScreen = await createLoadingWindow();
 
       setTimeout(async () => {
         try {
+          // Crear nueva ventana para la siguiente pantalla
           const newWindow = new BrowserWindow({
             width: 900,
             height: 700,
@@ -354,28 +369,33 @@ ipcMain.handle('token:verify', async (event, token) => {
             }
           });
 
+          // Cargar la siguiente pantalla
           await newWindow.loadFile(nextScreen);
           newWindow.show();
 
+          // Cerrar la ventana antigua si existe
           if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.close();
           }
 
+          // Actualizar la referencia a la ventana principal
           mainWindow = newWindow;
         } catch (err) {
           console.error('Error al cargar la siguiente pantalla:', err);
-          console.log(`Error al cargar la siguiente pantalla: ${err.message}`);
         } finally {
+          // Cerrar la pantalla de carga
           loadingScreen.close();
         }
-      }, 1000);
+      }, 1000); // Esperar 1 segundo para mostrar la pantalla de carga
     }
 
     return result;
   } catch (error) {
     console.error('Error en verificación de token:', error);
-    console.log(`Error en verificación de token: ${error.message}`);
-    return { valid: false, message: error.message };
+    return { 
+      valid: false, 
+      message: error.message || 'Error desconocido en la verificación del token' 
+    };
   }
 });
 

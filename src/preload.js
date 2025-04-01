@@ -23,8 +23,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return result;
   },
   verifyToken: async (token) => {
-    console.log(`verifyToken invoked with token: ${token}`);
+    console.log(`verifyToken invocado con token: ${token}`);
     const result = await ipcRenderer.invoke('token:verify', token);
+    console.log(`Resultado de verificación: ${JSON.stringify(result)}`);
     return result;
   },
   reloadApp: async () => {

@@ -140,6 +140,7 @@ class LicenseHandler {
   }
 
   // Método modificado para validar token con la nueva API
+  // Método mejorado para validar token con la API
   async validateToken(token) {
     try {
       const deviceInfo = this.getDeviceInfo();
@@ -147,6 +148,8 @@ class LicenseHandler {
       const deviceInfoString = JSON.stringify(deviceInfo);
 
       console.log('Validando token:', token);
+      
+      // Añadir tiempo límite para evitar bloqueos
       const response = await axios.post(
         `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.VALIDATE_TOKEN}`,
         {
@@ -156,17 +159,20 @@ class LicenseHandler {
         },
         {
           headers: API_CONFIG.HEADERS,
-          timeout: 10000
+          timeout: 10000 // 10 segundos de timeout
         }
       );
+
+      console.log('Respuesta del servidor:', response.data);
 
       if (response.status === 200 && response.data.success) {
         const tokenData = {
           token,
           machineId,
           deviceInfo: deviceInfoString,
-          // Si no viene expiresAt desde el servidor se asigna 30 días por defecto
-          expiresAt: response.data.expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          expiresAt: response.data.expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: new Date().toISOString(),
+          lastValidation: new Date().toISOString()
         };
 
         // Guardar el token validado
@@ -193,6 +199,7 @@ class LicenseHandler {
         const status = error.response.status;
         const message = error.response.data?.message || ERROR_MESSAGES.SERVER_ERROR;
 
+        // Manejo específico según código de estado
         return {
           valid: false,
           status: status === 403 ? TOKEN_STATUS.EXPIRED : TOKEN_STATUS.INVALID,
@@ -200,6 +207,7 @@ class LicenseHandler {
         };
       }
 
+      // Error de conexión
       return {
         valid: false,
         status: TOKEN_STATUS.INVALID,

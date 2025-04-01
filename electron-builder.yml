@@ -3,7 +3,7 @@ productName: "IKE Expedientes Automation"
 asar: true
 asarUnpack: ["**/node_modules/puppeteer-core/**/*"]
 removePackageScripts: true
-compression: "maximum"
+compression: "normal"
 
 # Configuración para actualizaciones automáticas
 publish:
@@ -59,4 +59,4 @@ linux:
   synopsis: "IKE Expedientes Automation"
   description: "Aplicación para automatizar la gestión de expedientes"
 
-afterPack: "./build/scripts/after-pack.js"
+#afterPack: "./build/scripts/after-pack.js"

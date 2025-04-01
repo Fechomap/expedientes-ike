@@ -18,3 +18,8 @@ data/*
 .DS_Store
 LOCAL/
 dist/
+
+
+dist-simple/
+build/
+build-simple.js
