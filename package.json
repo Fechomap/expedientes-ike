@@ -23,8 +23,7 @@
     "publish:win": "electron-builder --win -p always",
     "publish:mac": "electron-builder --mac -p always",
     "publish:linux": "electron-builder --linux -p always",
-    "publish:github": "node scripts/publish-github.js",
-    "full-build:win": "node scripts/full-windows-build.js"
+    "publish:github": "node scripts/publish-github.js"
   },
   "dependencies": {
     "asar": "^3.2.0",
@@ -50,9 +49,6 @@
     "appId": "com.ike.expedientes",
     "productName": "IKE Expedientes Automation",
     "asar": true,
-    "asarUnpack": [
-      "node_modules/puppeteer-core/**/*"
-    ],
     "files": [
       "src/**/*",
       "ui/**/*",
@@ -90,16 +86,7 @@
         }
       ],
       "icon": "build/icon.ico",
-      "requestedExecutionLevel": "asInvoker",
-      "extraResources": [
-        {
-          "from": "build/win-extras",
-          "to": "extraResources",
-          "filter": [
-            "**/*"
-          ]
-        }
-      ]
+      "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
       "oneClick": false,
@@ -111,10 +98,9 @@
       "shortcutName": "IKE Expedientes Automation",
       "uninstallDisplayName": "IKE Expedientes Automation",
       "artifactName": "IKE-Expedientes-Automation-Setup-${version}.${ext}",
-      "include": "build/installer.nsh",
       "warningsAsErrors": false,
-      "allowElevation": true,
-      "runAfterFinish": true    },
+      "include": "build/installer.nsh"
+    },
     "afterPack": "./build/scripts/after-pack.js"
   }
 }
