@@ -4,7 +4,7 @@
  * Contiene la información de conexión al servidor de licencias
  */
 const API_CONFIG = {
-  BASE_URL: 'https://ike-license-manager-9b796c40a448.herokuapp.com',
+  BASE_URL: 'https://web-production-917a7.up.railway.app',
   ENDPOINTS: {
     VALIDATE_TOKEN: '/api/validate',
     CHECK_VALIDITY: '/api/check-validity',
