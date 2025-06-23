@@ -222,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span class="stat-value">${data.stats?.totalAceptados || 0}</span>
                             </div>
                         </div>
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">OK</button>
+                        <button class="modal-close" onclick="showOpenFileModal()">OK</button>
                     </div>
                 </div>`;
 
@@ -230,4 +230,65 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.insertAdjacentHTML('beforeend', modalContent);
         }
     });
+
+    // Función para mostrar el modal de confirmación para abrir el archivo
+    window.showOpenFileModal = function() {
+        // Cerrar el modal de resumen
+        const currentModal = document.querySelector('.modal-overlay');
+        if (currentModal) {
+            currentModal.remove();
+        }
+
+        // Crear el modal de confirmación
+        const confirmModalContent = `
+            <div class="modal-overlay">
+                <div class="modal-container">
+                    <div class="modal-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#4F46E5" stroke-width="2"/>
+                            <polyline points="14,2 14,8 20,8" stroke="#4F46E5" stroke-width="2"/>
+                            <line x1="16" y1="13" x2="8" y2="13" stroke="#4F46E5" stroke-width="2"/>
+                            <line x1="16" y1="17" x2="8" y2="17" stroke="#4F46E5" stroke-width="2"/>
+                            <polyline points="10,9 9,9 8,9" stroke="#4F46E5" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <h3>Abrir Archivo Validado</h3>
+                    <p>¿Deseas abrir el archivo Excel que fue validado?</p>
+                    <div class="modal-buttons">
+                        <button class="modal-button modal-button-secondary" onclick="closeConfirmModal()">No</button>
+                        <button class="modal-button modal-button-primary" onclick="openValidatedFile()">Sí</button>
+                    </div>
+                </div>
+            </div>`;
+
+        // Insertar el modal en el DOM
+        document.body.insertAdjacentHTML('beforeend', confirmModalContent);
+    };
+
+    // Función para cerrar el modal de confirmación
+    window.closeConfirmModal = function() {
+        const confirmModal = document.querySelector('.modal-overlay');
+        if (confirmModal) {
+            confirmModal.remove();
+        }
+    };
+
+    // Función para abrir el archivo Excel validado
+    window.openValidatedFile = async function() {
+        if (selectedFilePath) {
+            try {
+                const result = await window.electronAPI.openFile(selectedFilePath);
+                if (!result.success) {
+                    alert('Error al abrir el archivo: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error al intentar abrir el archivo: ' + error.message);
+            }
+        } else {
+            alert('No hay archivo seleccionado para abrir');
+        }
+        
+        // Cerrar el modal de confirmación
+        closeConfirmModal();
+    };
 });
