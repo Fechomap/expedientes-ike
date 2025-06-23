@@ -90,12 +90,17 @@ class ProcessHandler {
     this.logger.info('Event bridging setup completed');
   }
 
-  async handleProcessExcel(event, { filePath, options = {} }) {
+  async handleProcessExcel(event, { filePath, releaseLogicConfig, options = {} }) {
     try {
-      this.logger.info('Handling process Excel request', { filePath });
+      this.logger.info('Handling process Excel request', { filePath, releaseLogicConfig });
 
       if (!filePath) {
         throw new Error('File path is required');
+      }
+
+      // Configurar las lógicas de liberación si se proporcionan
+      if (releaseLogicConfig) {
+        await this.processingService.setReleaseLogicConfig(releaseLogicConfig);
       }
 
       const result = await this.processingService.processExcelFile(filePath, options);

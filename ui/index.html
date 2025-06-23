@@ -53,6 +53,25 @@
                    <div id="progress" class="progress"></div>
                </div>
            </div>
+           
+           <!-- Nueva sección de lógicas de liberación -->
+           <div class="release-logic-section">
+               <h2>Lógicas de Liberación</h2>
+               <div class="logic-options">
+                   <div class="logic-item">
+                       <input type="checkbox" id="exactMatchLogic" checked disabled>
+                       <label for="exactMatchLogic">✅ Lógica 1: Costo exacto (siempre activa)</label>
+                   </div>
+                   <div class="logic-item">
+                       <input type="checkbox" id="marginLogic">
+                       <label for="marginLogic">Lógica 2: Margen de ±10%</label>
+                   </div>
+                   <div class="logic-item">
+                       <input type="checkbox" id="superiorLogic">
+                       <label for="superiorLogic">Lógica 3: Costo superior al ingresado</label>
+                   </div>
+               </div>
+           </div>
        </div>
 
        <div class="results-section">

@@ -316,6 +316,12 @@ class ProcessingService {
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
+
+  // Método para configurar las lógicas de liberación
+  async setReleaseLogicConfig(config) {
+    this.logger.info('Setting release logic config', config);
+    this.automationService.setReleaseLogicConfig(config);
+  }
 }
 
 module.exports = ProcessingService;

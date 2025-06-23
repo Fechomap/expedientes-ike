@@ -10,8 +10,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const checkUpdatesBtn = document.getElementById('checkUpdates');
     const configCredentialsBtn = document.getElementById('configCredentials');
     const versionInfoSpan = document.getElementById('versionInfo');
+    const marginLogicCheckbox = document.getElementById('marginLogic');
+    const superiorLogicCheckbox = document.getElementById('superiorLogic');
 
     let selectedFilePath = null;
+    let releaseLogicConfig = {
+        exactMatch: true,  // siempre activa
+        marginLogic: false,
+        superiorLogic: false
+    };
 
     startProcessBtn.disabled = true;
 
@@ -83,6 +90,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Manejadores de eventos para las lógicas de liberación
+    if (marginLogicCheckbox) {
+        marginLogicCheckbox.addEventListener('change', (e) => {
+            releaseLogicConfig.marginLogic = e.target.checked;
+            console.log('Margen logic:', releaseLogicConfig.marginLogic);
+        });
+    }
+
+    if (superiorLogicCheckbox) {
+        superiorLogicCheckbox.addEventListener('change', (e) => {
+            releaseLogicConfig.superiorLogic = e.target.checked;
+            console.log('Superior logic:', releaseLogicConfig.superiorLogic);
+        });
+    }
+
     selectExcelBtn.addEventListener('click', async () => {
         try {
             console.log('Botón SELECCIONAR EXCEL clickeado');
@@ -120,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
             progressBar.style.width = '0%';
             progressBar.style.display = 'block'; // Mostrar la barra de progreso
 
-            const response = await window.electronAPI.startProcess(selectedFilePath);
+            const response = await window.electronAPI.startProcess(selectedFilePath, releaseLogicConfig);
             
             if (response.success) {
                 statusDiv.textContent = response.message || 'Procesamiento completado con éxito';
