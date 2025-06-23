@@ -296,11 +296,6 @@ class AutomationService {
 
         // Extract cost and format it
         const costoSistema = cells[2] ? cells[2].textContent.trim().replace('$', '').replace(',', '') : '0';
-        const costoSistemaNum = parseFloat(costoSistema);
-        const costoGuardadoNum = parseFloat(guardado);
-        
-        // Implementar las nuevas lógicas de liberación
-        const shouldRelease = this.shouldReleaseExpediente(costoSistemaNum, costoGuardadoNum);
 
         return {
           costo: parseFloat(costoSistema), // Guardar como número, no como string formateado
@@ -309,10 +304,9 @@ class AutomationService {
           fechaRegistro: cells[5]?.textContent?.trim() || '',
           servicio: cells[6]?.textContent?.trim() || '',
           subservicio: cells[7]?.textContent?.trim() || '',
-          validacion: shouldRelease ? 'PENDIENTES' : 'PENDIENTES', // Se actualiza después si se libera
-          rawCosto: costoSistemaNum,
-          shouldRelease: shouldRelease,
-          costosCoinciden: costoSistemaNum === costoGuardadoNum // mantener compatibilidad
+          validacion: 'PENDIENTES', // Se actualiza después si se libera
+          rawCosto: parseFloat(costoSistema),
+          costosCoinciden: parseFloat(costoSistema) === parseFloat(guardado) // mantener compatibilidad
         };
       }, costoGuardado);
 
@@ -323,8 +317,12 @@ class AutomationService {
       // Update stats
       this.stats.totalConCosto++;
 
+      // Implementar las nuevas lógicas de liberación fuera del page.evaluate()
+      const shouldRelease = this.shouldReleaseExpediente(data.rawCosto, costoGuardado);
+      data.shouldRelease = shouldRelease;
+
       // Si debe liberarse según las lógicas configuradas, realizar liberación automática
-      if (data.shouldRelease) {
+      if (shouldRelease) {
         this.stats.totalAceptados++;
         
         this.logger.info('Costs match, starting automatic liberation process', { 
