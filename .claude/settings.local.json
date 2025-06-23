@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo $USER)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(rg:*)",
+      "Bash(ls:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": false
+}
