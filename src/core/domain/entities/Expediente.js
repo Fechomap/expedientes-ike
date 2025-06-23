@@ -56,7 +56,7 @@ class Expediente {
     this.status = 'failed';
     this.error = error;
     this.validacion = 'NO ENCONTRADO';
-    this.costo = '0'; // Columna numérica debe tener 0
+    this.costo = 0; // Número, no string
     this.estatus = 'N/A';
     this.notas = 'N/A';
     this.fechaRegistro = 'N/A';

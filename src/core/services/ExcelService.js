@@ -101,7 +101,10 @@ class ExcelService {
           const expediente = expedienteMap.get(numeroExpediente);
           
           // Update cells with new data (según el formato correcto del usuario)
-          row.getCell(3).value = expediente.costo || '';
+          const costoCell = row.getCell(3);
+          costoCell.value = expediente.costo || 0; // Asegurar que sea número
+          costoCell.numFmt = '#,##0.00'; // Formato de número con comas y 2 decimales
+          
           row.getCell(4).value = expediente.validacion || ''; // Estatus debe usar validacion (ACEPTADO/PENDIENTES/NO ENCONTRADO)
           row.getCell(5).value = expediente.notas || '';
           row.getCell(6).value = expediente.fechaRegistro || '';

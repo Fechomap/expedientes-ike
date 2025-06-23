@@ -91,7 +91,7 @@ class SearchResult {
       success: false,
       error: error.message || error,
       processingTime,
-      costo: '0',
+      costo: 0, // Número, no string
       estatus: 'N/A',
       notas: 'N/A',
       fechaRegistro: 'N/A',
@@ -105,7 +105,7 @@ class SearchResult {
     return new SearchResult({
       expedienteNumero,
       success: true,
-      costo: '0',
+      costo: 0, // Número, no string
       estatus: 'N/A',
       notas: 'N/A',
       fechaRegistro: 'N/A',

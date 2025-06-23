@@ -294,8 +294,7 @@ class AutomationService {
         const costosCoinciden = parseFloat(costoSistema) === parseFloat(guardado);
 
         return {
-          costo: new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
-            .format(parseFloat(costoSistema)),
+          costo: parseFloat(costoSistema), // Guardar como número, no como string formateado
           estatus: cells[3]?.textContent?.trim() || '',
           notas: cells[4]?.textContent?.trim() || '',
           fechaRegistro: cells[5]?.textContent?.trim() || '',
