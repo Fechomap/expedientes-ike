@@ -111,10 +111,16 @@ class ExcelService {
           row.getCell(7).value = expediente.servicio || '';
           row.getCell(8).value = expediente.subservicio || '';
           
-          // Columna 9: Número de lógica usada (como número)
+          // Columna 9: Número de lógica usada (formato mixto: números o N/A)
           const logicCell = row.getCell(9);
-          logicCell.value = expediente.logicUsed || null; // Número o null si no se liberó
-          logicCell.numFmt = '0'; // Formato de número entero
+          if (expediente.logicUsed === 'N/A') {
+            logicCell.value = 'N/A'; // Expediente no encontrado
+            logicCell.numFmt = '@'; // Formato de texto para N/A
+          } else {
+            // Asegurar que el valor 0 se escriba correctamente
+            logicCell.value = expediente.logicUsed !== null && expediente.logicUsed !== undefined ? expediente.logicUsed : 0; // 0, 1, 2, o 3
+            logicCell.numFmt = '0'; // Formato de número entero
+          }
           
           // Columna 10: Fecha y hora de validación
           const dateCell = row.getCell(10);

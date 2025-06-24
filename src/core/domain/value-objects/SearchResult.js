@@ -102,7 +102,7 @@ class SearchResult {
       servicio: 'N/A',
       subservicio: 'N/A',
       validacion: 'NO ENCONTRADO',
-      logicUsed: null,
+      logicUsed: 'N/A', // N/A = No encontrado
       validationDate: new Date()
     });
   }
@@ -118,7 +118,7 @@ class SearchResult {
       servicio: 'N/A',
       subservicio: 'N/A',
       validacion: 'NO ENCONTRADO',
-      logicUsed: null,
+      logicUsed: 'N/A', // N/A = No encontrado
       validationDate: new Date()
     });
   }

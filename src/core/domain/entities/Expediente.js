@@ -66,6 +66,8 @@ class Expediente {
     this.fechaRegistro = 'N/A';
     this.servicio = 'N/A';
     this.subservicio = 'N/A';
+    this.logicUsed = 'N/A'; // Expediente no encontrado = N/A
+    this.validationDate = new Date();
     this.updatedAt = new Date();
   }
 

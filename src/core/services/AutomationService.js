@@ -320,7 +320,16 @@ class AutomationService {
       // Implementar las nuevas lógicas de liberación fuera del page.evaluate()
       const releaseResult = this.shouldReleaseExpediente(data.rawCosto, costoGuardado);
       data.shouldRelease = releaseResult.shouldRelease;
-      data.logicUsed = releaseResult.logicUsed;
+      
+      // Determinar el status para la columna 9
+      if (releaseResult.shouldRelease) {
+        // Expediente liberado: usar el número de lógica (1, 2, o 3)
+        data.logicUsed = releaseResult.logicUsed;
+      } else {
+        // Expediente encontrado pero no liberado: status = 0 (requiere revisión)
+        data.logicUsed = 0;
+      }
+      
       data.validationDate = new Date(); // Agregar fecha y hora de validación
 
       // Si debe liberarse según las lógicas configuradas, realizar liberación automática
