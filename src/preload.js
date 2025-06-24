@@ -53,7 +53,7 @@ const configAPI = {
 // Process API
 const processAPI = {
   excel: async (filePath, options = {}) => {
-    return await ipcRenderer.invoke('process:excel', { filePath, options });
+    return await ipcRenderer.invoke('process:excel', { filePath, releaseLogicConfig: options.releaseLogicConfig, options });
   },
   expedientes: async (expedientes, options = {}) => {
     return await ipcRenderer.invoke('process:expedientes', { expedientes, options });
@@ -189,7 +189,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Legacy compatibility methods
   selectFile: dialogAPI.openFile,
   openFile: (filePath) => ipcRenderer.invoke('system:openFile', filePath),
-  startProcess: (filePath) => processAPI.excel(filePath),
+  startProcess: (filePath, releaseLogicConfig) => processAPI.excel(filePath, { releaseLogicConfig }),
   onProgress: eventAPI.onProcessProgress,
   verifyLicense: licenseAPI.validate,
   verifyToken: licenseAPI.validate,

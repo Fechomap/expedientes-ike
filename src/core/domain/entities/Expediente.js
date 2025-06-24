@@ -15,6 +15,8 @@ class Expediente {
     this.servicio = data.servicio || '';
     this.subservicio = data.subservicio || '';
     this.validacion = data.validacion || '';
+    this.logicUsed = data.logicUsed || null; // Columna 9: Número de lógica usada (1, 2, 3)
+    this.validationDate = data.validationDate || null; // Columna 10: Fecha y hora de validación
     this.fechaInicio = data.fechaInicio || null;
     this.fechaTermino = data.fechaTermino || null;
     this.procedimiento = data.procedimiento || '';
@@ -39,6 +41,8 @@ class Expediente {
     this.servicio = result.servicio || this.servicio;
     this.subservicio = result.subservicio || this.subservicio;
     this.validacion = result.validacion || this.validacion;
+    this.logicUsed = result.logicUsed || this.logicUsed;
+    this.validationDate = result.validationDate || this.validationDate;
     this.fechaInicio = result.fechaInicio || this.fechaInicio;
     this.fechaTermino = result.fechaTermino || this.fechaTermino;
     this.procedimiento = result.procedimiento || this.procedimiento;
@@ -62,6 +66,8 @@ class Expediente {
     this.fechaRegistro = 'N/A';
     this.servicio = 'N/A';
     this.subservicio = 'N/A';
+    this.logicUsed = 'N/A'; // Expediente no encontrado = N/A
+    this.validationDate = new Date();
     this.updatedAt = new Date();
   }
 
@@ -90,6 +96,8 @@ class Expediente {
       servicio: this.servicio,
       subservicio: this.subservicio,
       validacion: this.validacion,
+      logicUsed: this.logicUsed,
+      validationDate: this.validationDate?.toISOString(),
       fechaInicio: this.fechaInicio,
       fechaTermino: this.fechaTermino,
       procedimiento: this.procedimiento,

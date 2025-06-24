@@ -73,6 +73,8 @@ class ProcessingService {
               servicio: searchResult.servicio,
               subservicio: searchResult.subservicio,
               validacion: searchResult.validacion,
+              logicUsed: searchResult.logicUsed,
+              validationDate: searchResult.validationDate,
               fechaInicio: searchResult.fechaInicio,
               fechaTermino: searchResult.fechaTermino,
               procedimiento: searchResult.procedimiento,
@@ -217,6 +219,8 @@ class ProcessingService {
               servicio: searchResult.servicio,
               subservicio: searchResult.subservicio,
               validacion: searchResult.validacion,
+              logicUsed: searchResult.logicUsed,
+              validationDate: searchResult.validationDate,
               fechaInicio: searchResult.fechaInicio,
               fechaTermino: searchResult.fechaTermino,
               procedimiento: searchResult.procedimiento,
@@ -315,6 +319,12 @@ class ProcessingService {
 
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Método para configurar las lógicas de liberación
+  async setReleaseLogicConfig(config) {
+    this.logger.info('Setting release logic config', config);
+    this.automationService.setReleaseLogicConfig(config);
   }
 }
 

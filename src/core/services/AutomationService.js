@@ -16,6 +16,11 @@ class AutomationService {
       totalConCosto: 0,
       totalAceptados: 0
     };
+    this.releaseLogicConfig = {
+      exactMatch: true,
+      marginLogic: false,
+      superiorLogic: false
+    };
   }
 
   async initializeBrowser() {
@@ -291,7 +296,6 @@ class AutomationService {
 
         // Extract cost and format it
         const costoSistema = cells[2] ? cells[2].textContent.trim().replace('$', '').replace(',', '') : '0';
-        const costosCoinciden = parseFloat(costoSistema) === parseFloat(guardado);
 
         return {
           costo: parseFloat(costoSistema), // Guardar como número, no como string formateado
@@ -300,9 +304,9 @@ class AutomationService {
           fechaRegistro: cells[5]?.textContent?.trim() || '',
           servicio: cells[6]?.textContent?.trim() || '',
           subservicio: cells[7]?.textContent?.trim() || '',
-          validacion: costosCoinciden ? 'PENDIENTES' : 'PENDIENTES', // Se actualiza después si se libera
+          validacion: 'PENDIENTES', // Se actualiza después si se libera
           rawCosto: parseFloat(costoSistema),
-          costosCoinciden: costosCoinciden
+          costosCoinciden: parseFloat(costoSistema) === parseFloat(guardado) // mantener compatibilidad
         };
       }, costoGuardado);
 
@@ -313,8 +317,23 @@ class AutomationService {
       // Update stats
       this.stats.totalConCosto++;
 
-      // Si coinciden los costos, realizar liberación automática
-      if (data.costosCoinciden) {
+      // Implementar las nuevas lógicas de liberación fuera del page.evaluate()
+      const releaseResult = this.shouldReleaseExpediente(data.rawCosto, costoGuardado);
+      data.shouldRelease = releaseResult.shouldRelease;
+      
+      // Determinar el status para la columna 9
+      if (releaseResult.shouldRelease) {
+        // Expediente liberado: usar el número de lógica (1, 2, o 3)
+        data.logicUsed = releaseResult.logicUsed;
+      } else {
+        // Expediente encontrado pero no liberado: status = 0 (requiere revisión)
+        data.logicUsed = 0;
+      }
+      
+      data.validationDate = new Date(); // Agregar fecha y hora de validación
+
+      // Si debe liberarse según las lógicas configuradas, realizar liberación automática
+      if (releaseResult.shouldRelease) {
         this.stats.totalAceptados++;
         
         this.logger.info('Costs match, starting automatic liberation process', { 
@@ -443,6 +462,56 @@ class AutomationService {
 
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Método para configurar las lógicas de liberación
+  setReleaseLogicConfig(config) {
+    this.releaseLogicConfig = {
+      exactMatch: true, // siempre activa
+      marginLogic: config.marginLogic || false,
+      superiorLogic: config.superiorLogic || false
+    };
+    this.logger.info('Release logic config updated', this.releaseLogicConfig);
+  }
+
+  // Método que implementa las lógicas de liberación y retorna {shouldRelease, logicUsed}
+  shouldReleaseExpediente(costoSistema, costoGuardado) {
+    // Lógica 1: Costo exacto (siempre activa)
+    if (costoSistema === costoGuardado) {
+      this.logger.info('Expediente should be released: Exact match', { costoSistema, costoGuardado });
+      return { shouldRelease: true, logicUsed: 1 };
+    }
+
+    // Lógica 2: Margen de ±10%
+    if (this.releaseLogicConfig.marginLogic) {
+      const margenInferior = costoGuardado * 0.9;
+      const margenSuperior = costoGuardado * 1.1;
+      
+      if (costoSistema >= margenInferior && costoSistema <= margenSuperior) {
+        this.logger.info('Expediente should be released: Within ±10% margin', { 
+          costoSistema, 
+          costoGuardado, 
+          margenInferior, 
+          margenSuperior 
+        });
+        return { shouldRelease: true, logicUsed: 2 };
+      }
+    }
+
+    // Lógica 3: Costo superior al ingresado
+    if (this.releaseLogicConfig.superiorLogic) {
+      if (costoSistema > costoGuardado) {
+        this.logger.info('Expediente should be released: Superior cost', { costoSistema, costoGuardado });
+        return { shouldRelease: true, logicUsed: 3 };
+      }
+    }
+
+    this.logger.info('Expediente should NOT be released', { 
+      costoSistema, 
+      costoGuardado, 
+      config: this.releaseLogicConfig 
+    });
+    return { shouldRelease: false, logicUsed: null };
   }
 }
 
