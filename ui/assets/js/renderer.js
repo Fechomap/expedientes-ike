@@ -42,33 +42,108 @@ document.addEventListener('DOMContentLoaded', () => {
     // Log inicialización
     console.log('Inicializando interfaz principal...');  
 
-    // Funcionalidad de actualizaciones
+    // Sistema de actualizaciones MANUAL - Usuario controla todo
+    let updateInfo = null; // Información de la actualización disponible
+    
     if (checkUpdatesBtn) {
         checkUpdatesBtn.addEventListener('click', async () => {
             try {
                 statusDiv.textContent = 'Verificando actualizaciones...';
+                checkUpdatesBtn.disabled = true;
+                
                 const result = await window.electronAPI.checkForUpdates();
                 console.log('Resultado de verificación de actualizaciones:', result);
             } catch (error) {
                 console.error('Error al verificar actualizaciones:', error);
                 statusDiv.textContent = `Error al verificar actualizaciones: ${error.message}`;
+                checkUpdatesBtn.disabled = false;
             }
         });
     }
 
-    // Eventos de actualización
+    // Evento: Verificando actualizaciones
+    window.electronAPI.onUpdateChecking(() => {
+        statusDiv.textContent = 'Verificando actualizaciones...';
+        if (checkUpdatesBtn) checkUpdatesBtn.disabled = true;
+    });
+
+    // Evento: Actualización disponible - Preguntar al usuario
     window.electronAPI.onUpdateAvailable((info) => {
         console.log('Actualización disponible:', info);
-        // Esta notificación se maneja en el proceso principal
+        updateInfo = info;
+        
+        const shouldDownload = confirm(
+            `Nueva versión disponible: ${info.version}\n\n` +
+            `¿Deseas descargar la actualización ahora?\n\n` +
+            `Puedes instalarla cuando termines tu trabajo actual.`
+        );
+        
+        if (shouldDownload) {
+            statusDiv.textContent = `Descargando versión ${info.version}...`;
+            window.electronAPI.downloadUpdate();
+        } else {
+            statusDiv.textContent = `Actualización ${info.version} disponible. Haz clic en "Buscar Actualizaciones" para descargar.`;
+            if (checkUpdatesBtn) {
+                checkUpdatesBtn.textContent = `Descargar v${info.version}`;
+                checkUpdatesBtn.disabled = false;
+                // Cambiar función del botón para descargar
+                checkUpdatesBtn.onclick = async () => {
+                    statusDiv.textContent = `Descargando versión ${info.version}...`;
+                    checkUpdatesBtn.disabled = true;
+                    await window.electronAPI.downloadUpdate();
+                };
+            }
+        }
     });
 
+    // Evento: No hay actualizaciones
+    window.electronAPI.onUpdateNotAvailable(() => {
+        statusDiv.textContent = 'Tu aplicación está actualizada';
+        if (checkUpdatesBtn) {
+            checkUpdatesBtn.disabled = false;
+            checkUpdatesBtn.textContent = 'Buscar Actualizaciones';
+        }
+    });
+
+    // Evento: Progreso de descarga
     window.electronAPI.onUpdateProgress((progressObj) => {
-        statusDiv.textContent = `Descargando actualización: ${Math.round(progressObj.percent)}%`;
+        statusDiv.textContent = `Descargando: ${progressObj.percent}% (${Math.round(progressObj.bytesPerSecond / 1024)} KB/s)`;
     });
 
+    // Evento: Descarga completada - Preguntar al usuario si instalar
     window.electronAPI.onUpdateDownloaded((info) => {
         console.log('Actualización descargada:', info);
-        // Esta notificación se maneja en el proceso principal
+        
+        const shouldInstall = confirm(
+            `Actualización ${info.version} descargada correctamente.\n\n` +
+            `¿Deseas instalar y reiniciar la aplicación ahora?\n\n` +
+            `La aplicación se cerrará y se abrirá con la nueva versión.`
+        );
+        
+        if (shouldInstall) {
+            statusDiv.textContent = 'Instalando actualización...';
+            window.electronAPI.installUpdate();
+        } else {
+            statusDiv.textContent = `Actualización ${info.version} lista para instalar. Reinicia cuando gustes.`;
+            if (checkUpdatesBtn) {
+                checkUpdatesBtn.textContent = `Instalar v${info.version}`;
+                checkUpdatesBtn.disabled = false;
+                // Cambiar función del botón para instalar
+                checkUpdatesBtn.onclick = () => {
+                    window.electronAPI.installUpdate();
+                };
+            }
+        }
+    });
+
+    // Evento: Error en actualizaciones
+    window.electronAPI.onUpdateError((error) => {
+        console.error('Error en actualización:', error);
+        statusDiv.textContent = `Error de actualización: ${error}`;
+        if (checkUpdatesBtn) {
+            checkUpdatesBtn.disabled = false;
+            checkUpdatesBtn.textContent = 'Buscar Actualizaciones';
+        }
     });
 
     // Configurar credenciales

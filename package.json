@@ -1,6 +1,6 @@
 {
   "name": "ike-expedientes-automation",
-  "version": "1.0.5",
+  "version": "1.0.7",
   "description": "Automatización de procesamiento de expedientes IKE",
   "main": "src/main.js",
   "author": {
