@@ -188,6 +188,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Legacy compatibility methods
   selectFile: dialogAPI.openFile,
+  openFile: (filePath) => ipcRenderer.invoke('system:openFile', filePath),
   startProcess: (filePath) => processAPI.excel(filePath),
   onProgress: eventAPI.onProcessProgress,
   verifyLicense: licenseAPI.validate,

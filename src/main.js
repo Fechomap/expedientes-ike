@@ -123,6 +123,27 @@ class Application {
     
     this.logger.info('dialog:openFile handler registered successfully');
 
+    // Handler para abrir archivos del sistema
+    ipcMain.handle('system:openFile', async (event, filePath) => {
+      try {
+        this.logger.info('Opening file with system default application', { filePath });
+        
+        const { shell } = require('electron');
+        await shell.openPath(filePath);
+        
+        return {
+          success: true,
+          message: 'File opened successfully'
+        };
+      } catch (error) {
+        this.logger.error('Error opening file', { filePath, error: error.message });
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    });
+
     ipcMain.handle('app:exit', () => {
       app.quit();
     });
