@@ -197,22 +197,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveConfig: ({ username, password }) => configAPI.saveCredentials(username, password),
   getAppVersion: appAPI.getVersion,
   
-  // Update functions (placeholders for now)
+  // Sistema de actualizaciones MANUAL - Usuario controla todo
   checkForUpdates: async () => {
-    console.log('[PRELOAD] checkForUpdates called - not implemented');
-    return { success: false, message: 'Updates not implemented' };
+    console.log('[PRELOAD] Manual update check requested');
+    return await ipcRenderer.invoke('update:check');
+  },
+  downloadUpdate: async () => {
+    console.log('[PRELOAD] Manual update download requested');
+    return await ipcRenderer.invoke('update:download');
+  },
+  installUpdate: async () => {
+    console.log('[PRELOAD] Manual update installation requested');
+    return await ipcRenderer.invoke('update:install');
+  },
+  onUpdateChecking: (callback) => {
+    ipcRenderer.on('update:checking', () => callback());
   },
   onUpdateAvailable: (callback) => {
-    console.log('[PRELOAD] onUpdateAvailable called - not implemented');
-    // Do nothing for now
+    ipcRenderer.on('update:available', (event, info) => callback(info));
+  },
+  onUpdateNotAvailable: (callback) => {
+    ipcRenderer.on('update:not-available', () => callback());
   },
   onUpdateProgress: (callback) => {
-    console.log('[PRELOAD] onUpdateProgress called - not implemented');
-    // Do nothing for now
+    ipcRenderer.on('update:download-progress', (event, progressObj) => callback(progressObj));
   },
   onUpdateDownloaded: (callback) => {
-    console.log('[PRELOAD] onUpdateDownloaded called - not implemented');
-    // Do nothing for now
+    ipcRenderer.on('update:downloaded', (event, info) => callback(info));
+  },
+  onUpdateError: (callback) => {
+    ipcRenderer.on('update:error', (event, error) => callback(error));
   }
 });
 

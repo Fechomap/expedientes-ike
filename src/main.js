@@ -16,8 +16,9 @@ const LicenseEvents = require('./shared/events/events/LicenseEvents');
 log.transports.file.level = 'info';
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = 'info';
-autoUpdater.autoDownload = true;
-autoUpdater.autoInstallOnAppQuit = true;
+// Sistema de actualizaciones MANUAL - No descargar automáticamente
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false;
 
 class Application {
   constructor() {
@@ -157,6 +158,39 @@ class Application {
     ipcMain.handle('window:close', () => {
       if (this.mainWindow) {
         this.mainWindow.close();
+      }
+    });
+
+    // Handlers para sistema de actualizaciones MANUAL
+    ipcMain.handle('update:check', async () => {
+      try {
+        this.logger.info('Manual update check requested by user');
+        return await autoUpdater.checkForUpdates();
+      } catch (error) {
+        this.logger.error('Error checking for updates', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('update:download', async () => {
+      try {
+        this.logger.info('Manual download requested by user');
+        await autoUpdater.downloadUpdate();
+        return { success: true };
+      } catch (error) {
+        this.logger.error('Error downloading update', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('update:install', () => {
+      try {
+        this.logger.info('Manual installation requested by user');
+        autoUpdater.quitAndInstall();
+        return { success: true };
+      } catch (error) {
+        this.logger.error('Error installing update', error);
+        return { success: false, error: error.message };
       }
     });
   }
@@ -441,21 +475,41 @@ app.on('before-quit', () => {
   }
 });
 
-// Auto-updater events
+// Auto-updater events - Sistema MANUAL
 autoUpdater.on('checking-for-update', () => {
   log.info('Checking for update...');
+  // Notificar al renderer que está verificando
+  if (application && application.mainWindow) {
+    application.mainWindow.webContents.send('update:checking');
+  }
 });
 
 autoUpdater.on('update-available', (info) => {
-  log.info('Update available.');
+  log.info('Update available:', info.version);
+  // Notificar al renderer que hay actualización disponible
+  if (application && application.mainWindow) {
+    application.mainWindow.webContents.send('update:available', {
+      version: info.version,
+      releaseNotes: info.releaseNotes,
+      releaseDate: info.releaseDate
+    });
+  }
 });
 
 autoUpdater.on('update-not-available', (info) => {
   log.info('Update not available.');
+  // Notificar al renderer que no hay actualizaciones
+  if (application && application.mainWindow) {
+    application.mainWindow.webContents.send('update:not-available');
+  }
 });
 
 autoUpdater.on('error', (err) => {
-  log.error('Error in auto-updater. ' + err);
+  log.error('Error in auto-updater:', err);
+  // Notificar al renderer sobre el error
+  if (application && application.mainWindow) {
+    application.mainWindow.webContents.send('update:error', err.message);
+  }
 });
 
 autoUpdater.on('download-progress', (progressObj) => {
@@ -463,18 +517,29 @@ autoUpdater.on('download-progress', (progressObj) => {
   log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
   log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
   log.info(log_message);
+  
+  // Notificar progreso al renderer
+  if (application && application.mainWindow) {
+    application.mainWindow.webContents.send('update:download-progress', {
+      percent: Math.round(progressObj.percent),
+      transferred: progressObj.transferred,
+      total: progressObj.total,
+      bytesPerSecond: progressObj.bytesPerSecond
+    });
+  }
 });
 
 autoUpdater.on('update-downloaded', (info) => {
-  log.info('Update downloaded');
-  autoUpdater.quitAndInstall();
-});
-
-// Check for updates when ready
-app.on('ready', () => {
-  if (process.env.NODE_ENV !== 'development') {
-    autoUpdater.checkForUpdatesAndNotify();
+  log.info('Update downloaded, ready to install');
+  // Notificar al renderer que la descarga completó - USUARIO decide cuándo instalar
+  if (application && application.mainWindow) {
+    application.mainWindow.webContents.send('update:downloaded', {
+      version: info.version
+    });
   }
 });
+
+// NO verificar actualizaciones automáticamente al iniciar
+// El usuario debe hacer clic en "Buscar Actualizaciones"
 
 module.exports = Application;
