@@ -47,13 +47,25 @@ class LicenseHandler {
 
     // Crear la instancia de electron-store con manejo de errores mejorado
     try {
-      this.store = new Store({
+      // Configuración específica por plataforma para mejorar compatibilidad
+      const storeConfig = {
         name: 'license',
-        // Agregar encriptación opcional para mayor seguridad
-        encryptionKey: 'ike-secure-key-2024',
-        // Agregar función para manejar errores de deserialización
         clearInvalidConfig: true
-      });
+      };
+      
+      // Solo usar encriptación en macOS por problemas de compatibilidad en Windows
+      if (process.platform === 'darwin') {
+        storeConfig.encryptionKey = 'ike-secure-key-2024';
+      }
+      
+      // En Windows usar ruta más confiable
+      if (process.platform === 'win32') {
+        const path = require('path');
+        const os = require('os');
+        storeConfig.cwd = path.join(os.homedir(), '.ike-expedientes');
+      }
+      
+      this.store = new Store(storeConfig);
     } catch (storeError) {
       this.log.error('Error al inicializar electron-store:', storeError);
       // Si hay error, intentamos crear con opciones mínimas

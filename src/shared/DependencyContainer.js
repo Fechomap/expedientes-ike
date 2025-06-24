@@ -30,9 +30,27 @@ class DependencyContainer {
       let licenseStorage, configStorage, reportStorage;
       
       try {
-        licenseStorage = new ElectronStore({ name: 'license' });
-        configStorage = new ElectronStore({ name: 'config' });
-        reportStorage = new ElectronStore({ name: 'reports' });
+        // Configuración específica para Windows para mejorar persistencia
+        const getStoreConfig = (name) => {
+          const baseConfig = { name };
+          
+          if (process.platform === 'win32') {
+            return {
+              ...baseConfig,
+              // Configuración específica para Windows
+              clearInvalidConfig: true,
+              accessPropertiesByDotNotation: false,
+              // Usar ruta más confiable en Windows
+              cwd: require('path').join(require('os').homedir(), '.ike-expedientes')
+            };
+          }
+          
+          return baseConfig;
+        };
+
+        licenseStorage = new ElectronStore(getStoreConfig('license'));
+        configStorage = new ElectronStore(getStoreConfig('config'));
+        reportStorage = new ElectronStore(getStoreConfig('reports'));
       } catch (storageError) {
         this.logger.warn('Storage initialization failed, using memory fallback', storageError);
         // Create minimal fallback storage

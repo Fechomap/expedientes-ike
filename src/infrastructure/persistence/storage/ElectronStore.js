@@ -1,10 +1,49 @@
 const Store = require('electron-store');
 const Logger = require('../../../shared/utils/Logger');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
 class ElectronStore {
   constructor(options = {}) {
-    this.store = new Store(options);
     this.logger = Logger.getInstance('ElectronStore');
+    
+    try {
+      // Verificar permisos en Windows antes de crear el store
+      if (process.platform === 'win32' && options.cwd) {
+        this.ensureStoragePermissions(options.cwd);
+      }
+      
+      this.store = new Store(options);
+      this.logger.info('ElectronStore initialized successfully', { 
+        path: this.store.path,
+        platform: process.platform 
+      });
+    } catch (error) {
+      this.logger.error('Error initializing ElectronStore', error);
+      // Fallback a configuración básica
+      this.store = new Store({ 
+        name: options.name || 'fallback',
+        clearInvalidConfig: true 
+      });
+    }
+  }
+
+  ensureStoragePermissions(storageDir) {
+    try {
+      // Crear directorio si no existe
+      if (!fs.existsSync(storageDir)) {
+        fs.mkdirSync(storageDir, { recursive: true });
+        this.logger.info('Created storage directory', { dir: storageDir });
+      }
+      
+      // Verificar permisos de escritura
+      fs.accessSync(storageDir, fs.constants.W_OK);
+      this.logger.debug('Storage permissions verified', { dir: storageDir });
+    } catch (error) {
+      this.logger.warn('Storage permissions issue, using default location', error);
+      throw error;
+    }
   }
 
   async get(key, defaultValue = null) {
