@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsDiv = document.getElementById('results');
     const progressBar = document.getElementById('progress'); // la barra
     const checkUpdatesBtn = document.getElementById('checkUpdates');
+    const configCredentialsBtn = document.getElementById('configCredentials');
     const versionInfoSpan = document.getElementById('versionInfo');
 
     let selectedFilePath = null;
@@ -63,10 +64,33 @@ document.addEventListener('DOMContentLoaded', () => {
         // Esta notificación se maneja en el proceso principal
     });
 
+    // Configurar credenciales
+    if (configCredentialsBtn) {
+        configCredentialsBtn.addEventListener('click', async () => {
+            try {
+                console.log('Abriendo ventana de configuración de credenciales...');
+                const result = await window.electronAPI.app.openConfigWindow();
+                if (result.success) {
+                    statusDiv.textContent = 'Ventana de configuración abierta. Configure sus credenciales.';
+                } else {
+                    console.error('Error abriendo ventana de configuración:', result.error);
+                    statusDiv.textContent = 'Error al abrir la configuración';
+                }
+            } catch (error) {
+                console.error('Error al abrir configuración:', error);
+                statusDiv.textContent = 'Error al abrir la configuración';
+            }
+        });
+    }
+
     selectExcelBtn.addEventListener('click', async () => {
         try {
+            console.log('Botón SELECCIONAR EXCEL clickeado');
+            console.log('electronAPI disponible:', !!window.electronAPI);
+            console.log('selectFile disponible:', typeof window.electronAPI?.selectFile);
             console.log('Iniciando selección de archivo Excel...');  
             const result = await window.electronAPI.selectFile();
+            console.log('Resultado de selectFile:', result);
             if (result.success) {
                 selectedFilePath = result.filePath;
                 selectedFileSpan.textContent = selectedFilePath;
@@ -99,11 +123,43 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await window.electronAPI.startProcess(selectedFilePath);
             
             if (response.success) {
-                statusDiv.textContent = response.message;
+                statusDiv.textContent = response.message || 'Procesamiento completado con éxito';
                 console.log('Procesamiento completado con éxito');  
             } else {
-                statusDiv.textContent = `Error: ${response.message}`;
-                console.log(`Error en procesamiento: ${response.message}`);  
+                // Check if the error is due to missing credentials or login failure
+                if (response.code === 'CREDENTIALS_NOT_CONFIGURED' || response.code === 'LOGIN_FAILED') {
+                    statusDiv.textContent = response.code === 'CREDENTIALS_NOT_CONFIGURED' 
+                        ? 'Credenciales no configuradas' 
+                        : 'Error de login - Credenciales incorrectas';
+                    
+                    // Show button to open configuration
+                    const configButton = document.createElement('button');
+                    configButton.textContent = 'Configurar Credenciales';
+                    configButton.style.marginTop = '10px';
+                    configButton.style.backgroundColor = '#dc3545';
+                    configButton.style.color = 'white';
+                    configButton.style.border = 'none';
+                    configButton.style.padding = '10px 20px';
+                    configButton.style.borderRadius = '4px';
+                    configButton.style.cursor = 'pointer';
+                    configButton.onclick = async () => {
+                        try {
+                            const result = await window.electronAPI.app.openConfigWindow();
+                            if (result.success) {
+                                statusDiv.textContent = 'Ventana de configuración abierta. Configure sus credenciales.';
+                                resultsDiv.innerHTML = '';
+                            }
+                        } catch (err) {
+                            console.error('Error opening config window:', err);
+                        }
+                    };
+                    
+                    resultsDiv.innerHTML = '';
+                    resultsDiv.appendChild(configButton);
+                } else {
+                    statusDiv.textContent = `Error: ${response.error || response.message || 'Error desconocido'}`;
+                }
+                console.log(`Error en procesamiento: ${response.error || response.message}`);  
             }
         } catch (error) {
             console.error('Error:', error);
