@@ -318,11 +318,13 @@ class AutomationService {
       this.stats.totalConCosto++;
 
       // Implementar las nuevas lógicas de liberación fuera del page.evaluate()
-      const shouldRelease = this.shouldReleaseExpediente(data.rawCosto, costoGuardado);
-      data.shouldRelease = shouldRelease;
+      const releaseResult = this.shouldReleaseExpediente(data.rawCosto, costoGuardado);
+      data.shouldRelease = releaseResult.shouldRelease;
+      data.logicUsed = releaseResult.logicUsed;
+      data.validationDate = new Date(); // Agregar fecha y hora de validación
 
       // Si debe liberarse según las lógicas configuradas, realizar liberación automática
-      if (shouldRelease) {
+      if (releaseResult.shouldRelease) {
         this.stats.totalAceptados++;
         
         this.logger.info('Costs match, starting automatic liberation process', { 
@@ -463,12 +465,12 @@ class AutomationService {
     this.logger.info('Release logic config updated', this.releaseLogicConfig);
   }
 
-  // Método que implementa las lógicas de liberación
+  // Método que implementa las lógicas de liberación y retorna {shouldRelease, logicUsed}
   shouldReleaseExpediente(costoSistema, costoGuardado) {
     // Lógica 1: Costo exacto (siempre activa)
     if (costoSistema === costoGuardado) {
       this.logger.info('Expediente should be released: Exact match', { costoSistema, costoGuardado });
-      return true;
+      return { shouldRelease: true, logicUsed: 1 };
     }
 
     // Lógica 2: Margen de ±10%
@@ -483,7 +485,7 @@ class AutomationService {
           margenInferior, 
           margenSuperior 
         });
-        return true;
+        return { shouldRelease: true, logicUsed: 2 };
       }
     }
 
@@ -491,7 +493,7 @@ class AutomationService {
     if (this.releaseLogicConfig.superiorLogic) {
       if (costoSistema > costoGuardado) {
         this.logger.info('Expediente should be released: Superior cost', { costoSistema, costoGuardado });
-        return true;
+        return { shouldRelease: true, logicUsed: 3 };
       }
     }
 
@@ -500,7 +502,7 @@ class AutomationService {
       costoGuardado, 
       config: this.releaseLogicConfig 
     });
-    return false;
+    return { shouldRelease: false, logicUsed: null };
   }
 }
 

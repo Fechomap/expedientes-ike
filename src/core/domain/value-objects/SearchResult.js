@@ -9,6 +9,8 @@ class SearchResult {
     this.servicio = data.servicio || '';
     this.subservicio = data.subservicio || '';
     this.validacion = data.validacion || '';
+    this.logicUsed = data.logicUsed || null;
+    this.validationDate = data.validationDate || null;
     this.fechaInicio = data.fechaInicio || null;
     this.fechaTermino = data.fechaTermino || null;
     this.procedimiento = data.procedimiento || '';
@@ -59,6 +61,8 @@ class SearchResult {
       servicio: this.servicio,
       subservicio: this.subservicio,
       validacion: this.validacion,
+      logicUsed: this.logicUsed,
+      validationDate: this.validationDate?.toISOString(),
       fechaInicio: this.fechaInicio,
       fechaTermino: this.fechaTermino,
       procedimiento: this.procedimiento,
@@ -97,7 +101,9 @@ class SearchResult {
       fechaRegistro: 'N/A',
       servicio: 'N/A',
       subservicio: 'N/A',
-      validacion: 'NO ENCONTRADO'
+      validacion: 'NO ENCONTRADO',
+      logicUsed: null,
+      validationDate: new Date()
     });
   }
 
@@ -111,7 +117,9 @@ class SearchResult {
       fechaRegistro: 'N/A',
       servicio: 'N/A',
       subservicio: 'N/A',
-      validacion: 'NO ENCONTRADO'
+      validacion: 'NO ENCONTRADO',
+      logicUsed: null,
+      validationDate: new Date()
     });
   }
 }
